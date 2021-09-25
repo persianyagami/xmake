@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      OpportunityLiu
 -- @file        vsxmake.lua
@@ -24,6 +24,7 @@ import("vstudio.impl.vsinfo", { rootdir = path.directory(os.scriptdir()) })
 import("render")
 import("getinfo")
 import("core.project.config")
+import("core.cache.localcache")
 
 local template_root = path.join(os.scriptdir(), "vsproj", "templates")
 local template_sln = path.join(template_root, "sln", "vsxmake.sln")
@@ -57,7 +58,28 @@ function _buildparams(info, target, default)
             opt = table.join(target, opt)
         end
         for _, k in ipairs(opt) do
-            local v = (i._sub or {})[k] or (i._sub2 or {})[k] or (i._sub3 or {})[k] or (i._sub4 or {})[k]or i[k]
+            local v = (i._targets or {})[k]
+            if v == nil and i._arch_modes then
+                v = i._arch_modes[k]
+            end
+            if v == nil and i._paths then
+                v = i._paths[k]
+            end
+            if v == nil and i._dirs then
+                v = i._dirs[k]
+            end
+            if v == nil and i._deps then
+                v = i._deps[k]
+            end
+            if v == nil and i._groups then
+                v = i._groups[k]
+            end
+            if v == nil and i._group_deps then
+                v = i._group_deps[k]
+            end
+            if v == nil then
+                v = i[k]
+            end
             if v == nil then
                 raise("key '" .. k .. "' not found")
             end
@@ -82,32 +104,41 @@ function _buildparams(info, target, default)
         if args.arch then
             table.insert(r, info.archs)
         end
+        if args.group then
+            table.insert(r, info.groups)
+        end
+        if args.group_dep then
+            table.insert(r, info.group_deps)
+        end
         if args.dir then
-            table.insert(r, info._sub[target].dirs)
+            table.insert(r, info._targets[target].dirs)
         end
         if args.dep then
-            table.insert(r, info._sub[target].deps)
+            table.insert(r, info._targets[target].deps)
         end
         if args.filec then
-            local files = info._sub[target].sourcefiles
+            local files = info._targets[target].sourcefiles
             table.insert(r, _filter_files(files, {".c"}))
         elseif args.filecxx then
-            local files = info._sub[target].sourcefiles
+            local files = info._targets[target].sourcefiles
             table.insert(r, _filter_files(files, {".cpp", ".cc", ".cxx"}))
         elseif args.filecu then
-            local files = info._sub[target].sourcefiles
+            local files = info._targets[target].sourcefiles
             table.insert(r, _filter_files(files, {".cu"}))
         elseif args.fileobj then
-            local files = info._sub[target].sourcefiles
+            local files = info._targets[target].sourcefiles
             table.insert(r, _filter_files(files, {".obj", ".o"}))
         elseif args.filerc then
-            local files = info._sub[target].sourcefiles
+            local files = info._targets[target].sourcefiles
             table.insert(r, _filter_files(files, {".rc"}))
+        elseif args.fileui then -- for qt/.ui
+            local files = info._targets[target].sourcefiles
+            table.insert(r, _filter_files(files, {".ui"}))
         elseif args.incc then
-            local files = info._sub[target].headerfiles
+            local files = info._targets[target].headerfiles
             table.insert(r, _filter_files(files, nil, {".natvis"}))
         elseif args.incnatvis then
-            local files = info._sub[target].headerfiles
+            local files = info._targets[target].headerfiles
             table.insert(r, _filter_files(files, {".natvis"}))
         end
         return r
@@ -136,7 +167,20 @@ function _writefileifneeded(file, content)
         dprint("skipped file %s since the file has the same content", path.relative(file))
         return
     end
-    io.writefile(file, content)
+    -- we need utf8 with bom encoding for unicode
+    -- @see https://github.com/xmake-io/xmake/issues/1689
+    io.writefile(file, content, {encoding = "utf8bom"})
+end
+
+function _clear_cacheconf()
+    config.clear()
+    config.save()
+    localcache.clear("config")
+    localcache.clear("detect")
+    localcache.clear("option")
+    localcache.clear("package")
+    localcache.clear("toolchain")
+    localcache.save()
 end
 
 -- make
@@ -173,7 +217,7 @@ function make(version)
 
         for _, target in ipairs(info.targets) do
             local paramsprovidertarget = _buildparams(info, target, "<!-- nil -->")
-            local proj_dir = info._sub[target].vcxprojdir
+            local proj_dir = info._targets[target].vcxprojdir
 
             -- write project file
             local proj = path.join(proj_dir, target .. ".vcxproj")
@@ -188,5 +232,8 @@ function make(version)
             _trycp(template_items, proj_dir)
             _trycp(template_itemfil, proj_dir)
         end
+
+        -- clear config and local cache
+        _clear_cacheconf()
     end
 end

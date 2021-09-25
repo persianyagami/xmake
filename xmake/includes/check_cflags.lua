@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        check_cflags.lua
@@ -23,7 +23,7 @@
 -- e.g.
 --
 -- check_cflags("HAS_SSE2", "-msse2")
--- check_cflags("HAS_SSE2", {"-msse2", "/arch:SSE2"})
+-- check_cflags("HAS_SSE2", {"-msse", "-msse2"})
 --
 function check_cflags(definition, flags, opt)
     opt = opt or {}
@@ -45,15 +45,19 @@ end
 -- e.g.
 --
 -- configvar_check_cflags("HAS_SSE2", "-msse2")
--- configvar_check_cflags("HAS_SSE2", {"-msse2", "/arch:SSE2"})
--- configvar_check_cflags("SSE=2", "-msse2")
+-- configvar_check_cflags("HAS_SSE2", {"-msse", "-msse2"})
+-- configvar_check_cflags("HAS_SSE2", "-msse2", {default = 0})
+-- configvar_check_cflags("SSE_STR=2", "-msse2")
+-- configvar_check_cflags("SSE=2", "-msse2", {quote = false})
 --
 function configvar_check_cflags(definition, flags, opt)
     opt = opt or {}
     local optname = "__" .. (opt.name or definition)
     local defname, defval = unpack(definition:split('='))
     option(optname)
-        set_configvar(defname, defval or 1)
+        if opt.default == nil then
+            set_configvar(defname, defval or 1, {quote = opt.quote})
+        end
         on_check(function (option)
             import("core.tool.compiler")
             if compiler.has_flags("c", flags, opt) then
@@ -61,5 +65,9 @@ function configvar_check_cflags(definition, flags, opt)
             end
         end)
     option_end()
-    add_options(optname)
+    if opt.default == nil then
+        add_options(optname)
+    else
+        set_configvar(defname, has_config(optname) and (defval or 1) or opt.default, {quote = opt.quote})
+    end
 end

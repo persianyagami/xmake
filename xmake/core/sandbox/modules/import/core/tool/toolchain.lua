@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        toolchain.lua
@@ -31,7 +31,7 @@ local raise     = require("sandbox/modules/raise")
 function sandbox_core_tool_toolchain.list()
     local names = table.copy(platform.toolchains())
     if os.isfile(os.projectfile()) then
-        for name, _ in pairs(project.toolchains()) do
+        for _, name in ipairs(project.toolchains()) do
             table.insert(names, name)
         end
     end

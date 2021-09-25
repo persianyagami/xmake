@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -39,18 +39,8 @@ platform("macosx")
     -- set install directory
     set_installdir("/usr/local")
 
-    -- on check
-    on_check(function (platform)
-        import("core.project.config")
-        local arch = config.get("arch")
-        if not arch then
-            config.set("arch", os.arch())
-            cprint("checking for architecture ... ${color.success}%s", config.get("arch"))
-        end
-    end)
-
     -- set toolchains
-    set_toolchains("envs", "xcode", "clang", "gcc", "yasm", "nasm", "cuda", "dlang", "rust", "go", "gfortran", "zig")
+    set_toolchains("envs", "xcode", "clang", "gcc", "yasm", "nasm", "cuda", "dlang", "rust", "go", "gfortran", "zig", "fpc")
 
     -- set menu
     set_menu {

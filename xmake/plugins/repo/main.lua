@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -26,7 +26,7 @@ import("core.platform.platform")
 import("core.package.repository")
 import("devel.git")
 import("private.async.runjobs")
-import("actions.require.impl.environment", {rootdir = os.programdir()})
+import("private.action.require.impl.environment")
 
 -- add repository url
 function _add(name, url, branch, is_global)

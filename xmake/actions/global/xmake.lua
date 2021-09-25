@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -50,7 +50,8 @@ task("global")
                                                             end}
                 ,   {nil, "debugger",       "kv", "auto"    , "The debugger program path."                                }
                 ,   {category = "Build Configuration"}
-                ,   {nil, "build_warning",  "kv",  nil      , "Enable the warnings output by default when building."      }
+                ,   {nil, "build_warning",  "kv", nil       , "Enable the warnings output by default when building."      }
+                ,   {nil, "cachedir",       "kv", nil       , "The global cache directory."                               }
 
                     -- network configuration
                 ,   {category = "Network Configuration"}
@@ -91,7 +92,6 @@ task("global")
                         -- get global menu options
                         return menu.options("global")
                     end
-
                 }
             }
 

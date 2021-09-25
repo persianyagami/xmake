@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -45,6 +45,11 @@ end
 -- get the program file
 function xmake.programfile()
     return xmake._PROGRAM_FILE
+end
+
+-- use luajit?
+function xmake.luajit()
+    return xmake._LUAJIT
 end
 
 -- return module: xmake

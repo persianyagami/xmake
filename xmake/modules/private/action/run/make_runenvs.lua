@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki, OpportunityLiu
 -- @file        make_runenvs.lua
@@ -49,7 +49,7 @@ function _make_runpath_on_windows(target)
         end
     end
     for _, dep in ipairs(target:orderdeps()) do
-        if dep:targetkind() == "shared" then
+        if dep:kind() == "shared" then
             insert(dep:targetdir())
         end
     end

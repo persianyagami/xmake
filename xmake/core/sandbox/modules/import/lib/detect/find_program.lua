@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_program.lua
@@ -22,31 +22,25 @@
 local sandbox_lib_detect_find_program = sandbox_lib_detect_find_program or {}
 
 -- load modules
-local os        = require("base/os")
-local path      = require("base/path")
-local option    = require("base/winos")
-local table     = require("base/table")
-local utils     = require("base/utils")
-local option    = require("base/option")
-local project   = require("project/project")
-local sandbox   = require("sandbox/sandbox")
-local raise     = require("sandbox/modules/raise")
-local vformat   = require("sandbox/modules/vformat")
-local cache     = require("sandbox/modules/import/lib/detect/cache")
-local scheduler = require("sandbox/modules/import/core/base/scheduler")
+local os          = require("base/os")
+local path        = require("base/path")
+local option      = require("base/winos")
+local table       = require("base/table")
+local utils       = require("base/utils")
+local option      = require("base/option")
+local project     = require("project/project")
+local detectcache = require("cache/detectcache")
+local sandbox     = require("sandbox/sandbox")
+local package     = require("package/package")
+local raise       = require("sandbox/modules/raise")
+local vformat     = require("sandbox/modules/vformat")
+local scheduler   = require("sandbox/modules/import/core/base/scheduler")
 
 -- globals
 local checking  = nil
 
--- check program
-function sandbox_lib_detect_find_program._check(program, opt)
-
-    -- is *.exe for windows?
-    if os.host() == "windows" then
-        if not program:endswith(".exe") and not program:endswith(".cmd") and not program:endswith(".bat") then
-            program = program .. ".exe"
-        end
-    end
+-- do check
+function sandbox_lib_detect_find_program._do_check(program, opt)
 
     -- do not attempt to run program? check it fastly
     if opt.norun then
@@ -55,7 +49,11 @@ function sandbox_lib_detect_find_program._check(program, opt)
 
     -- no check script? attempt to run it directly
     if not opt.check then
-        return 0 == os.execv(program, {"--version"}, {stdout = os.nuldev(), stderr = os.nuldev(), envs = opt.envs})
+        local ok, errors = os.runv(program, {"--version"}, {envs = opt.envs})
+        if not ok and option.get("verbose") and option.get("diagnosis") then
+            utils.cprint("${color.warning}checkinfo: ${clear dim}" .. errors)
+        end
+        return ok
     end
 
     -- check it
@@ -68,10 +66,28 @@ function sandbox_lib_detect_find_program._check(program, opt)
     end
 
     -- check failed? print verbose error info
-    if not ok and option.get("diagnosis") then
+    if not ok and option.get("verbose") and option.get("diagnosis") then
         utils.cprint("${color.warning}checkinfo: ${clear dim}" .. errors)
     end
     return ok
+end
+
+-- check program
+function sandbox_lib_detect_find_program._check(program, opt)
+    local findname = program
+    if os.subhost() == "windows" then
+        if not program:endswith(".exe") and not program:endswith(".cmd") and not program:endswith(".bat") then
+            findname = program .. ".exe"
+        end
+    elseif os.subhost() == "msys" and os.isfile(program) and os.filesize(program) < 256 then
+        -- only a sh script on msys2? e.g. c:/msys64/usr/bin/7z
+        -- we need use sh to wrap it, otherwise os.exec cannot run it
+        program = "sh " .. program
+        findname = program
+    end
+    if sandbox_lib_detect_find_program._do_check(findname, opt) then
+        return program
+    end
 end
 
 -- find program from the given paths
@@ -109,9 +125,9 @@ function sandbox_lib_detect_find_program._find_from_paths(name, paths, opt)
 
                 -- the program path
                 if program_path and (os.isexec(program_path) or os.isexec(program_path:split("%s")[1])) then
-                    -- check it
-                    if sandbox_lib_detect_find_program._check(program_path, opt) then
-                        return program_path
+                    local program_path_real = sandbox_lib_detect_find_program._check(program_path, opt)
+                    if program_path_real then
+                        return program_path_real
                     end
                 end
             end
@@ -169,11 +185,11 @@ function sandbox_lib_detect_find_program._find(name, paths, opt)
         end
         program_path = winos.registry_query("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\" .. program_name)
         if program_path then
-            -- check it
             program_path = program_path:trim()
             if os.isexec(program_path) then
-                if sandbox_lib_detect_find_program._check(program_path, opt) then
-                    return program_path
+                local program_path_real = sandbox_lib_detect_find_program._check(program_path, opt)
+                if program_path_real then
+                    return program_path_real
                 end
             end
         end
@@ -181,18 +197,21 @@ function sandbox_lib_detect_find_program._find(name, paths, opt)
         -- attempt to find it use `which program` command
         local ok, program_path = os.iorunv("which", {name})
         if ok and program_path then
-            -- check it
             program_path = program_path:trim()
-            if os.isexec(program_path) then
-                if sandbox_lib_detect_find_program._check(program_path, opt) then
-                    return program_path
-                end
+            local program_path_real = sandbox_lib_detect_find_program._check(program_path, opt)
+            if program_path_real then
+                return program_path_real
             end
         end
     end
 
-    -- attempt to find it from the some default system directories
+    -- attempt to find it from the some default $PATH and system directories
     local syspaths = {}
+    --[[
+    local envpaths = os.getenv("PATH")
+    if envpaths then
+        table.join2(syspaths, path.splitenv(envpaths))
+    end]]
     if os.host() ~= "windows" then
         table.insert(syspaths, "/usr/local/bin")
         table.insert(syspaths, "/usr/bin")
@@ -208,8 +227,9 @@ function sandbox_lib_detect_find_program._find(name, paths, opt)
     --
     -- @note must be detected at the end, because full path is more accurate
     --
-    if sandbox_lib_detect_find_program._check(name, opt) then
-        return name
+    local program_path_real = sandbox_lib_detect_find_program._check(name, opt)
+    if program_path_real then
+        return program_path_real
     end
 end
 
@@ -255,8 +275,7 @@ function sandbox_lib_detect_find_program.main(name, opt)
     end
 
     -- attempt to get result from cache first
-    local cacheinfo = cache.load(cachekey)
-    local result = cacheinfo[name]
+    local result = detectcache:get2(cachekey, name)
     if result ~= nil and not opt.force then
         return result and result or nil
     end
@@ -279,10 +298,8 @@ function sandbox_lib_detect_find_program.main(name, opt)
     checking = nil
 
     -- cache result
-    cacheinfo[name] = result and result or false
-
-    -- save cache info
-    cache.save(cachekey, cacheinfo)
+    detectcache:set2(cachekey, name, result and result or false)
+    detectcache:save()
 
     -- trace
     if option.get("verbose") or opt.verbose then

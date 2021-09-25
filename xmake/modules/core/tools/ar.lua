@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        ar.lua
@@ -52,7 +52,7 @@ function linkargv(self, objectfiles, targetkind, targetfile, flags, opt)
     opt = opt or {}
     local argv = table.join(flags, targetfile, objectfiles)
     if is_host("windows") and not opt.rawargs then
-        argv = winos.cmdargv(argv)
+        argv = winos.cmdargv(argv, {escape = true})
     end
 
     -- make it
@@ -76,26 +76,4 @@ function link(self, objectfiles, targetkind, targetfile, flags)
     os.runv(program, argv, {envs = self:runenvs()})
 end
 
--- extract the static library to object directory
-function extract(self, libraryfile, objectdir)
-
-    -- make the object directory first
-    os.mkdir(objectdir)
-
-    -- get the absolute path of this library
-    libraryfile = path.absolute(libraryfile)
-
-    -- extract it
-    os.runv(self:program(), {"-x", libraryfile}, {curdir = objectdir})
-
-    -- check repeat object name
-    local repeats = {}
-    local objectfiles = os.iorunv(self:program(), {"-t", libraryfile})
-    for _, objectfile in ipairs(objectfiles:split('\n')) do
-        if repeats[objectfile] then
-            raise("object name(%s) conflicts in library: %s", objectfile, libraryfile)
-        end
-        repeats[objectfile] = true
-    end
-end
 

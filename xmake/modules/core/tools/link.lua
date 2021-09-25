@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        link.lua
@@ -58,16 +58,19 @@ function get(self, name)
 end
 
 -- make the strip flag
-function nf_strip(self, level)
+function nf_strip(self, level, target)
     -- @note we explicitly strip some useless code, because `/debug` may keep them
     -- @see https://github.com/xmake-io/xmake/issues/907
-    --
-    local maps =
-    {
-        debug = "/opt:ref /opt:icf"
-    ,   all   = "/opt:ref /opt:icf /ltcg" -- we enable /ltcg for optimize/smallest:/Gl
-    }
-    return maps[level]
+    if level == "all" then
+        -- we enable /ltcg for optimize/smallest:/Gl
+        local flags = {"/opt:ref", "/opt:icf"}
+        if target and target:get("optimize") == "smallest" then
+            table.insert(flags, "/ltcg")
+        end
+        return flags
+    elseif level == "debug" then
+        return {"/opt:ref", "/opt:icf"}
+    end
 end
 
 -- make the symbol flag
@@ -75,12 +78,15 @@ function nf_symbol(self, level, target)
 
     -- debug? generate *.pdb file
     local flags = nil
-    local targetkind = target:get("kind")
-    if level == "debug" and (targetkind == "binary" or targetkind == "shared") then
-        if target and target.symbolfile then
-            flags = "-debug -pdb:" .. target:symbolfile()
-        else
-            flags = "-debug"
+    if target then
+        if target:type() == "target" then
+            if level == "debug" and (target:is_binary() or target:is_shared()) then
+                flags = {"-debug", "-pdb:" .. target:symbolfile()}
+            end
+        else -- for option
+            if level == "debug" then
+                flags = "-debug"
+            end
         end
     end
     return flags
@@ -96,9 +102,16 @@ function nf_syslink(self, lib)
     return nf_link(self, lib)
 end
 
+-- make vs runtime flag
+function nf_runtime(self, vs_runtime)
+    if vs_runtime and vs_runtime:startswith("MT") then
+        return "-nodefaultlib:msvcrt.lib"
+    end
+end
+
 -- make the linkdir flag
 function nf_linkdir(self, dir)
-    return "-libpath:" .. os.args(path.translate(dir))
+    return {"-libpath:" .. path.translate(dir)}
 end
 
 -- make the link arguments list

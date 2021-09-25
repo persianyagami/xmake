@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      OpportunityLiu
 -- @file        progress.lua
@@ -75,6 +75,7 @@ end
 
 -- show the message with process
 function show(progress, format, ...)
+    progress = math.floor(progress)
     local progress_prefix = "${color.build.progress}" .. theme.get("text.build.progress_format") .. ":${clear} "
     if option.get("verbose") then
         cprint(progress_prefix .. "${dim}" .. format, progress, ...)
@@ -108,6 +109,17 @@ function show(progress, format, ...)
             end
             io.flush()
         end
+    end
+end
+
+-- get the message text with process
+function text(progress, format, ...)
+    progress = math.floor(progress)
+    local progress_prefix = "${color.build.progress}" .. theme.get("text.build.progress_format") .. ":${clear} "
+    if option.get("verbose") then
+        return string.format(progress_prefix .. "${dim}" .. format, progress, ...)
+    else
+        return string.format(progress_prefix .. format, progress, ...)
     end
 end
 

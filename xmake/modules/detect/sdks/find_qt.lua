@@ -12,19 +12,19 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_qt.lua
 --
 
 -- imports
-import("lib.detect.cache")
 import("lib.detect.find_file")
 import("lib.detect.find_tool")
 import("core.base.option")
 import("core.base.global")
 import("core.project.config")
+import("core.cache.detectcache")
 
 -- find qt sdk directory
 function _find_sdkdir(sdkdir, sdkver)
@@ -81,8 +81,10 @@ function _find_sdkdir(sdkdir, sdkver)
         {
             "HKEY_CLASSES_ROOT\\Applications\\QtProject.QtCreator.c\\shell\\Open\\Command",
             "HKEY_CLASSES_ROOT\\Applications\\QtProject.QtCreator.cpp\\shell\\Open\\Command",
+            "HKEY_CLASSES_ROOT\\Applications\\QtProject.QtCreator.pro\\shell\\Open\\Command",
             "HKEY_CURRENT_USER\\SOFTWARE\\Classes\\Applications\\QtProject.QtCreator.c\\shell\\Open\\Command",
-            "HKEY_CURRENT_USER\\SOFTWARE\\Classes\\Applications\\QtProject.QtCreator.cpp\\shell\\Open\\Command"
+            "HKEY_CURRENT_USER\\SOFTWARE\\Classes\\Applications\\QtProject.QtCreator.cpp\\shell\\Open\\Command",
+            "HKEY_CURRENT_USER\\SOFTWARE\\Classes\\Applications\\QtProject.QtCreator.pro\\shell\\Open\\Command"
         }
         for _, reg in ipairs(regs) do
             table.insert(paths, function ()
@@ -167,12 +169,13 @@ function _find_qt(sdkdir, sdkver)
     sdkdir = qtenvs.QT_INSTALL_PREFIX
     local sdkver = qtenvs.QT_VERSION
     local bindir = qtenvs.QT_INSTALL_BINS
+    local libexecdir = qtenvs.QT_INSTALL_LIBEXECS
     local qmldir = qtenvs.QT_INSTALL_QML
     local libdir = qtenvs.QT_INSTALL_LIBS
     local pluginsdir = qtenvs.QT_INSTALL_PLUGINS
     local includedir = qtenvs.QT_INSTALL_HEADERS
-    local mkspecsdir = path.join(qtenvs.QT_INSTALL_ARCHDATA, "mkspecs")
-    return {sdkdir = sdkdir, bindir = bindir, libdir = libdir, includedir = includedir, qmldir = qmldir, pluginsdir = pluginsdir, mkspecsdir = mkspecsdir, sdkver = sdkver}
+    local mkspecsdir = qtenvs.QMAKE_MKSPECS or path.join(qtenvs.QT_INSTALL_ARCHDATA, "mkspecs")
+    return {sdkdir = sdkdir, bindir = bindir, libexecdir = libexecdir, libdir = libdir, includedir = includedir, qmldir = qmldir, pluginsdir = pluginsdir, mkspecsdir = mkspecsdir, sdkver = sdkver}
 end
 
 -- find qt sdk toolchains
@@ -195,7 +198,7 @@ function main(sdkdir, opt)
 
     -- attempt to load cache first
     local key = "detect.sdks.find_qt"
-    local cacheinfo = cache.load(key)
+    local cacheinfo = detectcache:get(key) or {}
     if not opt.force and cacheinfo.qt and cacheinfo.qt.sdkdir and os.isdir(cacheinfo.qt.sdkdir) then
         return cacheinfo.qt
     end
@@ -227,8 +230,7 @@ function main(sdkdir, opt)
 
     -- save to cache
     cacheinfo.qt = qt or false
-    cache.save(key, cacheinfo)
-
-    -- ok?
+    detectcache:set(key, cacheinfo)
+    detectcache:save()
     return qt
 end

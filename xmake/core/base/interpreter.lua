@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        interpreter.lua
@@ -446,7 +446,7 @@ function interpreter:_filter(values, level)
     if table.is_dictionary(values) then
         local results = {}
         for key, value in pairs(values) do
-            key = filter:handle(key)
+            key = (type(key) == "string" and filter:handle(key) or key)
             if type(value) == "string" then
                 results[key] = filter:handle(value)
             elseif type(value) == "table" and level < 1 then
@@ -983,7 +983,7 @@ function interpreter:api_register_scope(...)
             for name, values in pairs(scope_info) do
                 local apifunc = self:api_func("set_" .. name) or self:api_func("add_" .. name) or self:api_func("on_" .. name) or self:api_func(name)
                 if apifunc then
-                    apifunc(values)
+                    apifunc(table.unpack(table.wrap(values)))
                 else
                     os.raise("unknown %s for %s(\"%s\")", name, scope_kind, scope_name)
                 end
@@ -1225,13 +1225,19 @@ function interpreter:api_register_set_dictionary(scope_kind, ...)
     assert(self)
 
     -- define implementation
-    local implementation = function (self, scope, name, dict_or_key, value)
+    local implementation = function (self, scope, name, dict_or_key, value, extra_config)
 
         -- check
         if type(dict_or_key) == "table" then
             scope[name] = dict_or_key
         elseif type(dict_or_key) == "string" and value ~= nil then
             scope[name] = {[dict_or_key] = value}
+            -- save extra config
+            if extra_config and table.is_dictionary(extra_config) then
+                scope["__extra_" .. name] = scope["__extra_" .. name] or {}
+                local extrascope = scope["__extra_" .. name]
+                extrascope[dict_or_key] = extra_config
+            end
         else
             -- error
             os.raise("set_%s(%s): invalid value type!", name, type(dict))
@@ -1249,14 +1255,21 @@ function interpreter:api_register_add_dictionary(scope_kind, ...)
     assert(self)
 
     -- define implementation
-    local implementation = function (self, scope, name, dict_or_key, value)
+    local implementation = function (self, scope, name, dict_or_key, value, extra_config)
 
         -- check
         scope[name] = scope[name] or {}
         if type(dict_or_key) == "table" then
             table.join2(scope[name], dict_or_key)
+            extra_config = value
         elseif type(dict_or_key) == "string" and value ~= nil then
             scope[name][dict_or_key] = value
+            -- save extra config
+            if extra_config and table.is_dictionary(extra_config) then
+                scope["__extra_" .. name] = scope["__extra_" .. name] or {}
+                local extrascope = scope["__extra_" .. name]
+                extrascope[dict_or_key] = extra_config
+            end
         else
             -- error
             os.raise("add_%s(%s): invalid value type!", name, type(dict))
@@ -1286,6 +1299,7 @@ function interpreter:api_register_set_paths(scope_kind, ...)
         end
 
         -- translate paths
+        values = table.join(unpack(values))
         local paths = self:_api_translate_paths(values, "set_" .. name)
 
         -- save values
@@ -1318,7 +1332,7 @@ function interpreter:api_register_del_paths(scope_kind, ...)
     local implementation = function (self, scope, name, ...)
 
         -- translate paths
-        local values = {...}
+        local values = table.join(...)
         local paths = self:_api_translate_paths(values, "del_" .. name)
 
         -- mark these paths as deleted
@@ -1357,6 +1371,7 @@ function interpreter:api_register_add_paths(scope_kind, ...)
         end
 
         -- translate paths
+        values = table.join(unpack(values))
         local paths = self:_api_translate_paths(values, "add_" .. name)
 
         -- save values

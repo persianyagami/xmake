@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        os.lua
@@ -33,6 +33,8 @@ local vformat   = require("sandbox/modules/vformat")
 local sandbox_os = sandbox_os or {}
 
 -- inherit some builtin interfaces
+sandbox_os.shell        = os.shell
+sandbox_os.term         = os.term
 sandbox_os.host         = os.host
 sandbox_os.arch         = os.arch
 sandbox_os.subhost      = os.subhost
@@ -57,9 +59,13 @@ sandbox_os.addenv       = os.addenv
 sandbox_os.setenvp      = os.setenvp
 sandbox_os.addenvp      = os.addenvp
 sandbox_os.getenvs      = os.getenvs
+sandbox_os.setenvs      = os.setenvs
+sandbox_os.addenvs      = os.addenvs
+sandbox_os.joinenvs     = os.joinenvs
 sandbox_os.pbpaste      = os.pbpaste
 sandbox_os.pbcopy       = os.pbcopy
 sandbox_os.cpuinfo      = os.cpuinfo
+sandbox_os.default_njob = os.default_njob
 sandbox_os.emptydir     = os.emptydir
 sandbox_os.filesize     = os.filesize
 sandbox_os.features     = os.features
@@ -426,17 +432,17 @@ end
 
 -- match directories
 function sandbox_os.dirs(pattern, callback)
-    return sandbox_os.match(pattern, 'd', callback)
+    return (sandbox_os.match(pattern, 'd', callback))
 end
 
 -- match files
 function sandbox_os.files(pattern, callback)
-    return sandbox_os.match(pattern, 'f', callback)
+    return (sandbox_os.match(pattern, 'f', callback))
 end
 
 -- match files and directories
 function sandbox_os.filedirs(pattern, callback)
-    return sandbox_os.match(pattern, 'a', callback)
+    return (sandbox_os.match(pattern, 'a', callback))
 end
 
 -- is directory?

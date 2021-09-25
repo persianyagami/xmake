@@ -88,7 +88,6 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);$(XmakeDefines)</PreprocessorDefinitions>
-    
       <LanguageStandard Condition="'%(LanguageStandard)' == '' And $(XmakeLanguages.Contains('cxx11'))">stdcpp11</LanguageStandard>
       <LanguageStandard Condition="'%(LanguageStandard)' == '' And $(XmakeLanguages.Contains('cxx14'))">stdcpp14</LanguageStandard>
       <LanguageStandard Condition="'%(LanguageStandard)' == '' And $(XmakeLanguages.Contains('cxx17'))">stdcpp17</LanguageStandard>
@@ -101,7 +100,15 @@
       <LanguageStandard Condition="'%(LanguageStandard)' == '' And $(XmakeLanguages.Contains('gnuxx1z'))">stdcpp17</LanguageStandard>
       <LanguageStandard Condition="'%(LanguageStandard)' == '' And $(XmakeLanguages.Contains('gnuxx20'))">stdcpplatest</LanguageStandard>
       <LanguageStandard Condition="'%(LanguageStandard)' == '' And $(XmakeLanguages.Contains('gnuxx2a'))">stdcpplatest</LanguageStandard>
+      <PrecompiledHeader Condition="'%(PrecompiledHeader)' == '' And $(XmakePrecompiledHeader.Contains('.h'))">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'%(PrecompiledHeaderFile)' == '' And $(XmakePrecompiledHeader.Contains('.h'))">$(XmakeProjectDir)\$(XmakePrecompiledHeader)</PrecompiledHeaderFile>
+      <ForcedIncludeFiles Condition="'%(ForcedIncludeFiles)' == '' And $(XmakePrecompiledHeader.Contains('.h'))">$(XmakeProjectDir)\$(XmakePrecompiledHeader);%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
+
+    <Link>
+      <SubSystem Condition="'%(SubSystem)' == '' And $(XmakeSubSystem.Contains('console'))">Console</SubSystem>
+      <SubSystem Condition="'%(SubSystem)' == '' And $(XmakeSubSystem.Contains('windows'))">Windows</SubSystem>
+    </Link>
   </ItemDefinitionGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />

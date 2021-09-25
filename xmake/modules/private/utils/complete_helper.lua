@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      OpportunityLiu
 -- @file        complete_helper.lua
@@ -42,7 +42,7 @@ function runable_targets()
             local targets = project.targets()
             local runable = {}
             for k, v in pairs(targets) do
-                if v:script("run") or v:get("kind") == "binary" then
+                if v:script("run") or v:is_binary() then
                     table.insert(runable, k)
                 end
             end

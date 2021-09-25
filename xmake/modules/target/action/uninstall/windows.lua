@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        windows.lua
@@ -31,6 +31,7 @@ end
 function _uninstall_shared_for_package(target, pkg, outputdir)
     for _, dllpath in ipairs(table.wrap(pkg:get("libfiles"))) do
         if dllpath:endswith(".dll") then
+            local dllname = path.filename(dllpath)
             os.vrm(path.join(outputdir, dllname))
         end
     end
@@ -59,7 +60,7 @@ function uninstall_binary(target, opt)
     -- remove the dependent shared/windows (*.dll) target
     -- @see https://github.com/xmake-io/xmake/issues/961
     for _, dep in ipairs(target:orderdeps()) do
-        if dep:targetkind() == "shared" then
+        if dep:kind() == "shared" then
             os.vrm(path.join(binarydir, path.filename(dep:targetfile())))
         end
         _uninstall_shared_for_packages(dep, binarydir)
@@ -80,7 +81,7 @@ function uninstall_shared(target, opt)
     -- @see https://github.com/xmake-io/xmake/issues/714
     local targetfile = target:targetfile()
     local librarydir = path.join(target:installdir(), opt and opt.libdir or "lib")
-    os.vrm(path.join(librarydir, path.basename(targetfile) .. ".lib"))
+    os.vrm(path.join(librarydir, path.basename(targetfile) .. (target:is_plat("mingw") and ".dll.a" or ".lib")))
 
     -- remove headers from the include directory
     _uninstall_headers(target, opt)

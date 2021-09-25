@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        ml.lua
@@ -87,7 +87,7 @@ end
 
 -- make the includedir flag
 function nf_includedir(self, dir)
-    return "-I" .. os.args(dir)
+    return {"-I" .. dir}
 end
 
 -- make the sysincludedir flag
@@ -97,7 +97,7 @@ end
 
 -- make the compile arguments list
 function compargv(self, sourcefile, objectfile, flags)
-    return self:program(), table.join("-c", flags, "-Fo" .. os.args(objectfile), sourcefile)
+    return self:program(), table.join("-c", flags, "-Fo" .. objectfile, sourcefile)
 end
 
 -- compile the source file

@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        interactive.c
@@ -318,8 +318,17 @@ tb_int_t xm_sandbox_interactive(lua_State* lua)
              *
              * stack: arg1(top) scriptfunc arg1(sandbox_scope) -> ...
              */
+#ifdef USE_LUAJIT
             lua_pushvalue(lua, 1);
             lua_setfenv(lua, -2);
+#else
+            // stack: arg1(top) scriptfunc $interactive_setfenv scriptfunc arg1(sandbox_scope) -> ...
+            lua_getfield(lua, 1, "$interactive_setfenv");
+            lua_pushvalue(lua, -2);
+            lua_pushvalue(lua, 1);
+            if (lua_pcall(lua, 2, 0, 0) != 0)
+                tb_printl(lua_pushfstring(lua, "error calling " LUA_QL("$interactive_setfenv") " (%s)", lua_tostring(lua, -1)));
+#endif
 
             /* run script
              *

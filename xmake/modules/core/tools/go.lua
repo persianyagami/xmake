@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        go.lua
@@ -80,7 +80,7 @@ end
 
 -- make the includedir flag
 function nf_includedir(self, dir)
-    return "-I " .. os.args(dir)
+    return {"-I", dir}
 end
 
 -- make the sysincludedir flag
@@ -90,7 +90,7 @@ end
 
 -- make the linkdir flag
 function nf_linkdir(self, dir)
-    return "-L " .. os.args(dir)
+    return {"-L", dir}
 end
 
 -- make the link arguments list

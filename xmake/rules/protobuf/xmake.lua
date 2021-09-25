@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -20,23 +20,14 @@
 
 -- define rule: protobuf.cpp
 rule("protobuf.cpp")
-
-    -- set extension
     set_extensions(".proto")
-
-    -- build protobuf file
-    before_build_file(function (target, sourcefile_proto, opt)
-        import("proto")(target, "cxx", sourcefile_proto, opt)
+    before_buildcmd_file(function (target, batchcmds, sourcefile_proto, opt)
+        return import("proto").buildcmd(target, batchcmds, sourcefile_proto, opt, "cxx")
     end)
-
 
 -- define rule: protobuf.c
 rule("protobuf.c")
-
-    -- set extension
     set_extensions(".proto")
-
-    -- build protobuf file
-    before_build_file(function (target, sourcefile_proto, opt)
-        import("proto")(target, "cc", sourcefile_proto, opt)
+    before_buildcmd_file(function (target, batchcmds, sourcefile_proto, opt)
+        return import("proto").buildcmd(target, batchcmds, sourcefile_proto, opt, "cc")
     end)

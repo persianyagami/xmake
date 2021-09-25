@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        configfiles.lua
@@ -24,12 +24,13 @@ import("core.base.semver")
 import("core.project.config")
 import("core.project.project")
 import("core.platform.platform")
+import("lib.detect.find_tool")
 
 -- get all configuration files
 function _get_configfiles()
     local configfiles = {}
     for _, target in pairs(project.targets()) do
-        if target:get("enabled") ~= false then
+        if target:is_enabled() then
 
             -- get configuration files for target
             local srcfiles, dstfiles, fileinfos = target:configfiles()
@@ -86,6 +87,34 @@ function _get_builtinvars_target(target)
     return builtinvars
 end
 
+-- get the git builtin variables
+function _get_builtinvars_git(builtinvars)
+    local cmds =
+    {
+        GIT_TAG         = {"describe", "--tags"},
+        GIT_TAG_LONG    = {"describe", "--tags", "--long"},
+        GIT_BRANCH      = {"rev-parse", "--abbrev-ref", "HEAD"},
+        GIT_COMMIT      = {"rev-parse", "--short", "HEAD"},
+        GIT_COMMIT_LONG = {"rev-parse", "HEAD"},
+        GIT_COMMIT_DATE = {"log", "-1", "--date=format:%Y%m%d%H%M%S", "--format=%ad"}
+    }
+    for name, argv in pairs(cmds) do
+        builtinvars[name] = function ()
+            local result
+            local git = find_tool("git")
+            if git then
+                result = try {function ()
+                    return os.iorunv(git.program, argv)
+                end}
+            end
+            if not result then
+                result = "none"
+            end
+            return result:trim()
+        end
+    end
+end
+
 -- get the global builtin variables
 function _get_builtinvars_global()
     local builtinvars = _g.builtinvars_global
@@ -104,6 +133,7 @@ function _get_builtinvars_global()
             builtinvars_upper[name:upper()] = type(value) == "string" and value:upper() or value
         end
         table.join2(builtinvars, builtinvars_upper)
+        _get_builtinvars_git(builtinvars)
         _g.builtinvars_global = builtinvars
     end
     return builtinvars
@@ -137,7 +167,9 @@ function _generate_configfile(srcfile, dstfile, fileinfo, targets)
             -- get variables from the target
             for name, value in pairs(target:get("configvar")) do
                 if variables[name] == nil then
-                    variables[name] = table.unwrap(value)
+                    value = table.unwrap(value)
+                    variables[name] = value
+                    variables["__extraconf_" .. name] = target:extraconf("configvar." .. name, value)
                 end
             end
 
@@ -146,6 +178,7 @@ function _generate_configfile(srcfile, dstfile, fileinfo, targets)
                 for name, value in pairs(opt:get("configvar")) do
                     if variables[name] == nil then
                         variables[name] = table.unwrap(value)
+                        variables["__extraconf_" .. name] = target:extraconf("configvar." .. name, value)
                     end
                 end
             end
@@ -155,12 +188,16 @@ function _generate_configfile(srcfile, dstfile, fileinfo, targets)
                 for name, value in pairs(pkg:get("configvar")) do
                     if variables[name] == nil then
                         variables[name] = table.unwrap(value)
+                        variables["__extraconf_" .. name] = target:extraconf("configvar." .. name, value)
                     end
                 end
             end
 
             -- get the builtin variables from the target
             for name, value in pairs(_get_builtinvars_target(target)) do
+                if type(value) == "function" then
+                    value = value()
+                end
                 if variables[name] == nil then
                     variables[name] = value
                 end
@@ -168,6 +205,9 @@ function _generate_configfile(srcfile, dstfile, fileinfo, targets)
         end
         -- get the global builtin variables
         for name, value in pairs(_get_builtinvars_global()) do
+            if type(value) == "function" then
+                value = value()
+            end
             if variables[name] == nil then
                 variables[name] = value
             end
@@ -200,6 +240,7 @@ function _generate_configfile(srcfile, dstfile, fileinfo, targets)
 
             -- get variable value
             local value = variables[variable]
+            local extraconf = variables["__extraconf_" .. variable]
             if isdefine then
                 if value == nil then
                     value = ("/* #undef %s */"):format(variable)
@@ -212,7 +253,12 @@ function _generate_configfile(srcfile, dstfile, fileinfo, targets)
                 elseif type(value) == "number" then
                     value = ("#define %s %d"):format(variable, value)
                 elseif type(value) == "string" then
-                    value = ("#define %s \"%s\""):format(variable, value)
+                    -- disable to wrap quote, @see https://github.com/xmake-io/xmake/issues/1694
+                    if extraconf and extraconf.quote == false then
+                        value = ("#define %s %s"):format(variable, value)
+                    else
+                        value = ("#define %s \"%s\""):format(variable, value)
+                    end
                 else
                     raise("unknown variable(%s) type: %s", variable, type(value))
                 end

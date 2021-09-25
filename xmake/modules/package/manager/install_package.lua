@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        install_package.lua
@@ -38,6 +38,7 @@ function _install_package(manager_name, package_name, opt)
         table.insert(managers, "apt")
         table.insert(managers, "yum")
         table.insert(managers, "pacman")
+        table.insert(managers, "portage")
         table.insert(managers, "brew")
     elseif is_host("macosx") then
         table.insert(managers, "vcpkg")

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        bytes.lua
@@ -23,17 +23,11 @@ local bytes = bytes or {}
 local _instance = _instance or {}
 
 -- load modules
-local bit        = require('bit')
-local ffi        = require('ffi')
+local bit        = require("base/bit")
 local os         = require("base/os")
 local utils      = require("base/utils")
 local todisplay  = require("base/todisplay")
-
--- define ffi interfaces
-ffi.cdef[[
-    void* malloc(size_t size);
-    void  free(void* data);
-]]
+local libc       = require("base/libc")
 
 -- new a bytes instance
 --
@@ -57,10 +51,10 @@ function _instance.new(...)
             local ptr = arg2
             local manage = arg3
             if manage then
-                instance._CDATA   = ffi.gc(ffi.cast("unsigned char*", ptr), ffi.C.free)
+                instance._CDATA   = libc.dataptr(ptr, {gc = true})
                 instance._MANAGED = true
             else
-                instance._CDATA   = ffi.cast("unsigned char*", ptr)
+                instance._CDATA   = libc.dataptr(ptr)
                 instance._MANAGED = false
             end
         else
@@ -75,11 +69,11 @@ function _instance.new(...)
                     os.raise("invalid arguments #2 for bytes(size, ...), cdata, string, number or nil expected!")
                 end
             end
-            local ptr = ffi.C.malloc(size)
+            local ptr = libc.malloc(size, {gc = true})
             if init then
-                ffi.fill(ptr, size, init)
+                libc.memset(ptr, init, size)
             end
-            instance._CDATA   = ffi.gc(ffi.cast("unsigned char*", ptr), ffi.C.free)
+            instance._CDATA   = ptr
             instance._MANAGED = true
         end
         instance._SIZE     = size
@@ -88,7 +82,7 @@ function _instance.new(...)
         -- bytes(str): mounts a buffer from the given string
         local str = arg1
         instance._SIZE     = #str
-        instance._CDATA    = ffi.cast("unsigned char*", str)
+        instance._CDATA    = libc.dataptr(str)
         instance._REF      = str -- keep ref for GC
         instance._MANAGED  = false
         instance._READONLY = true
@@ -102,7 +96,7 @@ function _instance.new(...)
                 os.raise("incorrect bounds(%d-%d) for bytes(...)!", start, last)
             end
             instance._SIZE     = last - start + 1
-            instance._CDATA    = b:cdata() - 1 + start
+            instance._CDATA    = b:cdata() -1 + start
             instance._REF      = b -- keep lua ref for GC
             instance._MANAGED  = false
             instance._READONLY = b:readonly()
@@ -112,10 +106,10 @@ function _instance.new(...)
             for _, b in ipairs(args) do
                 instance._SIZE = instance._SIZE + b:size()
             end
-            instance._CDATA = ffi.gc(ffi.cast("unsigned char*", ffi.C.malloc(instance._SIZE)), ffi.C.free)
+            instance._CDATA = libc.malloc(instance._SIZE, {gc = true})
             local offset = 0
             for _, b in ipairs(args) do
-                ffi.copy(instance._CDATA + offset, b:cdata(), b:size())
+                libc.memcpy(instance._CDATA + offset, b:cdata(), b:size())
                 offset = offset + b:size()
             end
             instance._MANAGED  = true
@@ -127,10 +121,10 @@ function _instance.new(...)
             for _, b in ipairs(args) do
                 instance._SIZE = instance._SIZE + b:size()
             end
-            instance._CDATA = ffi.gc(ffi.cast("unsigned char*", ffi.C.malloc(instance._SIZE)), ffi.C.free)
+            instance._CDATA = libc.malloc(instance._SIZE, {gc = true})
             local offset = 0
             for _, b in ipairs(args) do
-                ffi.copy(instance._CDATA + offset, b._CDATA, b:size())
+                libc.memcpy(instance._CDATA + offset, b._CDATA, b:size())
                 offset = offset + b:size()
             end
             instance._MANAGED  = true
@@ -144,7 +138,7 @@ function _instance.new(...)
                 os.raise("incorrect bounds(%d-%d)!", start, last)
             end
             instance._SIZE     = last - start + 1
-            instance._CDATA    = b:cdata() - 1 + start
+            instance._CDATA    = b:cdata() -1 + start
             instance._REF      = b -- keep lua ref for GC
             instance._MANAGED  = false
             instance._READONLY = b:readonly()
@@ -181,7 +175,7 @@ end
 
 -- get data address
 function _instance:caddr()
-    return tonumber(ffi.cast('unsigned long long', self:cdata()))
+    return libc.ptraddr(self:cdata())
 end
 
 -- readonly?
@@ -216,7 +210,7 @@ function _instance:copy(src)
     if src:size() ~= self:size() then
         os.raise("%s: cannot copy bytes, src and dst must have same size(%d->%d)!", self, src:size(), self:size())
     end
-    ffi.copy(self:cdata(), src:cdata(), self:size())
+    libc.memcpy(self:cdata(), src:cdata(), self:size())
     return self
 end
 
@@ -330,7 +324,7 @@ end
 -- convert bytes to string
 function _instance:str(i, j)
     local offset = i and i - 1 or 0
-    return ffi.string(self:cdata() + offset, (j or self:size()) - offset)
+    return libc.strndup(self:cdata() + offset, (j or self:size()) - offset)
 end
 
 -- get uint8 value
@@ -396,7 +390,7 @@ function _instance:__index(key)
         if key < 1 or key > self:size() then
             os.raise("%s: index(%d/%d) out of bounds!", self, key, self:size())
         end
-        return self._CDATA[key - 1]
+        return libc.byteof(self._CDATA, key - 1)
     elseif type(key) == "table" then
         local start, last = key[1], key[2]
         return self:slice(start, last)
@@ -417,7 +411,7 @@ function _instance:__newindex(key, value)
         if key < 1 or key > self:size() then
             os.raise("%s: index(%d/%d) out of bounds!", self, key, self:size())
         end
-        self._CDATA[key - 1] = value
+        libc.setbyte(self._CDATA, key - 1, value)
         return
     elseif type(key) == "table" then
         local start, last = key[1], key[2]
@@ -451,6 +445,14 @@ function _instance:__todisplay()
         parts[i] = "0x" .. bit.tohex(self[i], 2)
     end
     return "bytes${reset}(" .. todisplay(self:size()) .. ") <${color.dump.number}" .. table.concat(parts, " ") .. (self:size() > 8 and "${reset} ..>" or "${reset}>")
+end
+
+-- it's only called for lua runtime, because bytes is not userdata
+function _instance:__gc()
+    if self._MANAGED and self._CDATA then
+        libc.free(self._CDATA)
+        self._CDATA = nil
+    end
 end
 
 -- new an bytes instance

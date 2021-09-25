@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        require.lua
@@ -46,7 +46,11 @@ task("require")
                                                          "    $ xmake require --clean",
                                                          "    $ xmake require --clean zlib tbox pcr*"                          }
                 ,   {'f', "force",      "k",  nil,       "Force to reinstall all package dependencies."                        }
+                ,   {'j', "jobs",       "kv", tostring(os.default_njob()),
+                                                         "Set the number of parallel compilation jobs."                        }
+                ,   {nil, "linkjobs",   "kv", nil,       "Set the number of parallel link jobs."                               }
                 ,   {nil, "shallow",    "k",  nil,       "Does not install dependent packages."                                }
+                ,   {nil, "build",      "k",  nil,       "Always build and install packages from source."                      }
                 ,   {'l', "list",       "k",  nil,       "List all package dependencies in project.",
                                                          "e.g.",
                                                          "    $ xmake require --list"                                          }
@@ -68,6 +72,7 @@ task("require")
                 ,   {'s', "search",     "k",  nil,       "Search for the given packages from repositories.",
                                                          "e.g.",
                                                          "    $ xmake require --search tbox"                                   }
+                ,   {nil, "upgrade",    "k",  nil,       "Upgrade the installed packages."                                     }
                 ,   {nil, "uninstall",  "k",  nil,       "Uninstall the installed packages.",
                                                          "e.g.",
                                                          "    $ xmake require --uninstall",
@@ -77,9 +82,15 @@ task("require")
                                                          "e.g.",
                                                          "    $ xmake require --export",
                                                          "    $ xmake require --export tbox zlib",
-                                                         "    $ xmake require --export --exportdir=packagesdir zlib",
+                                                         "    $ xmake require --export --packagedir=packagesdir zlib",
                                                          "    $ xmake require --export --extra=\"{debug=true}\" tbox"          }
-                ,   {nil, "exportdir",  "kv", "packages","Set the exported packages directory."                                }
+                ,   {nil, "import",     "k", nil,        "Import the installed packages and their dependencies.",
+                                                         "e.g.",
+                                                         "    $ xmake require --import",
+                                                         "    $ xmake require --import tbox zlib",
+                                                         "    $ xmake require --import --packagedir=packagesdir zlib",
+                                                         "    $ xmake require --import --extra=\"{debug=true}\" tbox"          }
+                ,   {nil, "packagedir", "kv", "packages","Set the packages directory for exporting and importing."             }
                 ,   {nil, "extra",      "kv", nil,       "Set the extra info of packages."                                     }
                 ,   {                                                                                                          }
                 ,   {nil, "requires",   "vs", nil,       "The package requires.",

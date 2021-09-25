@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -20,14 +20,14 @@
 
 -- define rule: win.sdk.resource
 rule("win.sdk.resource")
-    set_extensions(".rc")
+    set_sourcekinds("mrc")
     on_build_files("private.action.build.object", {batch = true})
 
 -- define rule: application
 rule("win.sdk.application")
 
     -- before load
-    before_load(function (target)
+    on_load(function (target)
         target:set("kind", "binary")
     end)
 

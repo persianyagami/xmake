@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -26,7 +26,7 @@ import("private.action.clean.remove_files")
 function main(target)
 
     -- is phony?
-    if target:isphony() then
+    if target:is_phony() then
         return
     end
 

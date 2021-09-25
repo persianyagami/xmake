@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_package.lua
@@ -22,7 +22,7 @@
 import("lib.detect.find_file")
 import("lib.detect.find_path")
 import("lib.detect.find_library")
-import("lib.detect.pkg_config")
+import("lib.detect.pkgconfig")
 import("detect.sdks.find_xcode")
 import("core.project.config")
 
@@ -60,7 +60,7 @@ function _find_package_from_unixdirs(name, links, opt)
     -- find library
     local result = nil
     for _, link in ipairs(links) do
-        local libinfo = find_library(link, linkdirs)
+        local libinfo = find_library(link, linkdirs, {plat = opt.plat})
         if libinfo then
             result          = result or {}
             result.links    = table.join(result.links or {}, libinfo.link)
@@ -148,7 +148,7 @@ function main(name, opt)
     local version = nil
     local links = table.wrap(opt.links)
     if #links == 0 then
-        pkginfo = pkg_config.libinfo(name)
+        pkginfo = pkgconfig.libinfo(name)
         if pkginfo then
             links = table.wrap(pkginfo.links)
             version = pkginfo.version

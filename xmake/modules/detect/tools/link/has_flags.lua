@@ -12,14 +12,14 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        has_flags.lua
 --
 
 -- imports
-import("lib.detect.cache")
+import("core.cache.detectcache")
 import("lib.detect.find_tool")
 
 -- try running
@@ -42,11 +42,8 @@ function _check_from_arglist(flags, opt)
     -- make allflags key
     local flagskey = opt.program .. "_" .. (opt.programver or "")
 
-    -- load cache
-    local cacheinfo = cache.load(key)
-
     -- get all allflags from argument list
-    local allflags = cacheinfo[flagskey]
+    local allflags = detectcache:get2(key, flagskey)
     if not allflags then
 
         -- get argument list
@@ -67,8 +64,8 @@ function _check_from_arglist(flags, opt)
         end
 
         -- save cache
-        cacheinfo[flagskey] = allflags
-        cache.save(key, cacheinfo)
+        detectcache:set2(key, flagskey, allflags)
+        detectcache:save()
     end
     return allflags[flags[1]:gsub("/", "-"):lower()]
 end
@@ -79,7 +76,7 @@ function _check_try_running(flags, opt)
     -- make an stub source file
     local flags_str = table.concat(flags, " "):lower()
     local winmain = flags_str:find("subsystem:windows")
-    local sourcefile = path.join(os.tmpdir(), "detect", ifelse(winmain, "winmain_", "") .. "link_has_flags.c")
+    local sourcefile = path.join(os.tmpdir(), "detect", (winmain and "winmain_" or "") .. "link_has_flags.c")
     if not os.isfile(sourcefile) then
         if winmain then
             io.writefile(sourcefile, "int WinMain(void* instance, void* previnst, char** argv, int argc)\n{return 0;}")

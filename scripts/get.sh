@@ -50,7 +50,7 @@ get_host_speed() {
     if [ `uname` == "Darwin" ]; then
         ping -c 1 -t 1 $1 2>/dev/null | egrep -o 'time=\d+' | egrep -o "\d+" || echo "65535"
     else
-        ping -c 1 -W 1 $1 2>/dev/null | egrep -o 'time=\d+' | egrep -o "\d+" || echo "65535"
+        ping -c 1 -W 1 $1 2>/dev/null | grep -P -o 'time=\d+' | grep -P -o "\d+" || echo "65535"
     fi
 }
 
@@ -104,13 +104,13 @@ fi
 # below is installation
 # print a LOGO!
 echo 'xmake, A cross-platform build utility based on Lua.   '
-echo 'Copyright (C) 2015-2020 Ruki Wang, tboox.org, xmake.io'
+echo 'Copyright (C) 2015-present Ruki Wang, tboox.org, xmake.io'
 echo '                         _                            '
 echo '    __  ___ __  __  __ _| | ______                    '
 echo '    \ \/ / |  \/  |/ _  | |/ / __ \                   '
 echo '     >  <  | \__/ | /_| |   <  ___/                   '
 echo '    /_/\_\_|_|  |_|\__ \|_|\_\____|                   '
-echo '                         by ruki, tboox.org           '
+echo '                         by ruki, xmake.io            '
 echo '                                                      '
 echo '   👉  Manual: https://xmake.io/#/getting_started     '
 echo '   🙏  Donate: https://xmake.io/#/sponsor             '
@@ -153,11 +153,12 @@ install_tools()
     { yum --version >/dev/null 2>&1 && $sudoprefix yum install -y git readline-devel ccache && $sudoprefix yum groupinstall -y 'Development Tools'; } ||
     { zypper --version >/dev/null 2>&1 && $sudoprefix zypper --non-interactive install git readline-devel ccache && $sudoprefix zypper --non-interactive install -t pattern devel_C_C++; } ||
     { pacman -V >/dev/null 2>&1 && $sudoprefix pacman -S --noconfirm --needed git base-devel ccache; } ||
+    { emerge -V >/dev/null 2>&1 && $sudoprefix emerge -atv dev-vcs/git ccache; } ||
     { pkg list-installed >/dev/null 2>&1 && $sudoprefix pkg install -y git getconf build-essential readline ccache; } || # termux
     { pkg help >/dev/null 2>&1 && $sudoprefix pkg install -y git readline ccache ncurses; } || # freebsd
-    { apk --version >/dev/null 2>&1 && $sudoprefix apk add gcc g++ make readline-dev ncurses-dev libc-dev linux-headers; }
+    { apk --version >/dev/null 2>&1 && $sudoprefix apk add git gcc g++ make readline-dev ncurses-dev libc-dev linux-headers; }
 }
-test_tools || { install_tools && test_tools; } || my_exit "$(echo -e 'Dependencies Installation Fail\nThe getter currently only support these package managers\n\t* apt\n\t* yum\n\t* zypper\n\t* pacman\nPlease install following dependencies manually:\n\t* git\n\t* build essential like `make`, `gcc`, etc\n\t* libreadline-dev (readline-devel)\n\t* ccache (optional)')" 1
+test_tools || { install_tools && test_tools; } || my_exit "$(echo -e 'Dependencies Installation Fail\nThe getter currently only support these package managers\n\t* apt\n\t* yum\n\t* zypper\n\t* pacman\n\t* portage\nPlease install following dependencies manually:\n\t* git\n\t* build essential like `make`, `gcc`, etc\n\t* libreadline-dev (readline-devel)\n\t* ccache (optional)')" 1
 projectdir=$tmpdir
 if [ 'x__local__' = "x$branch" ]; then
     if [ -d '.git' ]; then
@@ -226,11 +227,18 @@ write_profile()
 install_profile()
 {
     if [ ! -d ~/.xmake ]; then mkdir ~/.xmake; fi
-    echo "export PATH=$prefix/bin:\$PATH" > ~/.xmake/profile
+    echo "export XMAKE_ROOTDIR=\"$prefix/bin\"" > ~/.xmake/profile
+    echo 'export PATH="$XMAKE_ROOTDIR:$PATH"' >> ~/.xmake/profile
     if [ -f "$projectdir/scripts/register-completions.sh" ]; then
         cat "$projectdir/scripts/register-completions.sh" >> ~/.xmake/profile
     else
         remote_get_content "$gitrepo_raw/scripts/register-completions.sh" >> ~/.xmake/profile
+    fi
+
+    if [ -f "$projectdir/scripts/register-virtualenvs.sh" ]; then
+        cat "$projectdir/scripts/register-virtualenvs.sh" >> ~/.xmake/profile
+    else
+        remote_get_content "$gitrepo_raw/scripts/register-virtualenvs.sh" >> ~/.xmake/profile
     fi
 
     if   [[ "$SHELL" = */zsh ]]; then 

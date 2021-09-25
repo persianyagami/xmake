@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        string.lua
@@ -24,7 +24,7 @@ local string = string or {}
 -- load modules
 local deprecated = require("base/deprecated")
 local serialize  = require("base/serialize")
-local bit        = require("bit")
+local bit        = require("base/bit")
 
 -- save original interfaces
 string._dump   = string._dump or string.dump

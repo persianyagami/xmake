@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        update.lua
@@ -30,8 +30,8 @@ import("lib.detect.find_tool")
 --
 -- import("devel.git.submodule")
 --
--- submodule.update("master", {repodir = "/tmp/xmake", init = true, remote = true})
--- submodule.update("v1.0.1", {repodir = "/tmp/xmake", recursive = true, reference = "xxx", paths = "xxx"})
+-- submodule.update({repodir = "/tmp/xmake", init = true, remote = true})
+-- submodule.update({repodir = "/tmp/xmake", recursive = true, longpaths = true, reference = "xxx", paths = "xxx"})
 --
 -- @endcode
 --
@@ -58,17 +58,26 @@ function main(opt)
         table.join2(argv, opt.paths)
     end
 
-    -- enter repository directory
-    local oldir = nil
-    if opt.repodir then
-        oldir = os.cd(opt.repodir)
+    -- enable long paths
+    local longpaths_old
+    local longpaths_changed = false
+    if opt.longpaths then
+        local longpaths_old = try {function () return os.iorunv(git.program, {"config", "--get", "--global", "core.longpaths"}, {curdir = opt.repodir}) end}
+        if not longpaths_old or not longpaths_old:find("true") then
+            os.vrunv(git.program, {"config", "--global", "core.longpaths", "true"}, {curdir = opt.repodir})
+            longpaths_changed = true
+        end
     end
 
     -- submodule it
-    os.vrunv(git.program, argv)
+    os.vrunv(git.program, argv, {curdir = opt.repodir})
 
-    -- leave repository directory
-    if oldir then
-        os.cd(oldir)
+    -- restore old long paths configuration
+    if longpaths_changed then
+        if longpaths_old and longpaths_old:find("false") then
+            os.vrunv(git.program, {"config", "--global", "core.longpaths", "false"}, {curdir = opt.repodir})
+        else
+            os.vrunv(git.program, {"config", "--global", "--unset", "core.longpaths", {curdir = opt.repodir}})
+        end
     end
 end

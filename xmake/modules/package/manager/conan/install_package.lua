@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        install_package.lua
@@ -21,6 +21,7 @@
 -- imports
 import("core.base.option")
 import("core.project.config")
+import("core.tool.toolchain")
 import("core.platform.platform")
 import("lib.detect.find_tool")
 import("devel.git")
@@ -219,7 +220,11 @@ function main(name, opt)
             table.insert(argv, "compiler.runtime=" .. opt.vs_runtime)
         end
     elseif opt.plat == "iphoneos" then
-        local target_minver = config.get("target_minver_iphoneos")
+        local target_minver = nil
+        local toolchain_xcode = toolchain.load("xcode", {plat = opt.plat, arch = opt.arch})
+        if toolchain_xcode then
+            target_minver = toolchain_xcode:config("target_minver")
+        end
         if target_minver and tonumber(target_minver) > 10 and (arch == "armv7" or arch == "armv7s" or arch == "x86") then
             target_minver = "10" -- iOS 10 is the maximum deployment target for 32-bit targets
         end
@@ -266,10 +271,11 @@ function main(name, opt)
         envs.ARFLAGS   = table.concat(table.wrap(_conan_get_build_env("arflags", opt.plat)), ' ')
         envs.LDFLAGS   = table.concat(table.wrap(_conan_get_build_env("ldflags", opt.plat)), ' ')
         envs.SHFLAGS   = table.concat(table.wrap(_conan_get_build_env("shflags", opt.plat)), ' ')
-        local ndk = config.get("ndk")
-        if ndk then
+        local toolchain_ndk = toolchain.load("ndk", {plat = opt.plat, arch = opt.arch})
+        local ndk_sysroot = toolchain_ndk:config("ndk_sysroot")
+        if ndk_sysroot then
             table.insert(argv, "-e")
-            table.insert(argv, "CONAN_CMAKE_FIND_ROOT_PATH=" .. path.join(ndk, "sysroot"))
+            table.insert(argv, "CONAN_CMAKE_FIND_ROOT_PATH=" .. ndk_sysroot)
         end
         for k, v in pairs(envs) do
             table.insert(argv, "-e")

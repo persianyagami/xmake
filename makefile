@@ -1,9 +1,10 @@
 # is debug?
 debug  		:=n
-verbose 	:=
 
-#debug   	:=y
-#verbose 	:=-v
+# verbose
+ifneq ($(VERBOSE),y)
+VECHO = @
+endif
 
 # prefix
 ifeq ($(prefix),) # compatible with brew script (make install PREFIX=xxx DESTDIR=/xxx)
@@ -12,6 +13,11 @@ prefix 		:=$(if $(findstring /usr/local/bin,$(PATH)),/usr/local,/usr)
 else
 prefix 		:=$(PREFIX)
 endif
+endif
+
+# use luajit or lua backend
+ifeq ($(RUNTIME),)
+RUNTIME 	:=luajit
 endif
 
 # the temporary directory
@@ -42,10 +48,10 @@ endif
 BUILD_ARCH 	:=$(if $(findstring windows,$(PLAT)),x86,$(BUILD_ARCH))
 BUILD_ARCH 	:=$(if $(findstring msys,$(PLAT)),$(MSYSARCH),$(BUILD_ARCH))
 BUILD_ARCH 	:=$(if $(findstring cygwin,$(PLAT)),x$(shell getconf LONG_BIT),$(BUILD_ARCH))
-BUILD_ARCH 	:=$(if $(findstring macosx,$(PLAT)),x$(shell getconf LONG_BIT),$(BUILD_ARCH))
+BUILD_ARCH 	:=$(if $(findstring macosx,$(PLAT)),$(shell uname -m),$(BUILD_ARCH))
 BUILD_ARCH 	:=$(if $(findstring linux,$(PLAT)),$(shell uname -m),$(BUILD_ARCH))
 BUILD_ARCH 	:=$(if $(findstring bsd,$(PLAT)),x$(shell getconf LONG_BIT),$(BUILD_ARCH))
-BUILD_ARCH 	:=$(if $(findstring iphoneos,$(PLAT)),armv7,$(BUILD_ARCH))
+BUILD_ARCH 	:=$(if $(findstring iphoneos,$(PLAT)),arm64,$(BUILD_ARCH))
 BUILD_ARCH 	:=$(if $(findstring android,$(PLAT)),armv7,$(BUILD_ARCH))
 BUILD_ARCH 	:=$(if $(findstring i686,$(BUILD_ARCH)),i386,$(BUILD_ARCH))
 BUILD_ARCH 	:=$(if $(findstring x32,$(BUILD_ARCH)),i386,$(BUILD_ARCH))
@@ -93,7 +99,7 @@ xrepo_bin_install   :=$(destdir)/bin/xrepo
 build:
 	@echo compiling xmake-core ...
 	@if [ -f core/.config.mak ]; then rm core/.config.mak; fi
-	+@$(MAKE) -C core --no-print-directory f DEBUG=$(debug)
+	+@$(MAKE) -C core --no-print-directory f DEBUG=$(debug) RUNTIME=$(RUNTIME)
 	+@$(MAKE) -C core --no-print-directory c
 	+@$(MAKE) -C core --no-print-directory
 
@@ -113,10 +119,10 @@ install:
 	@cp -r xmake/* $(xmake_dir_install)
 	@# install the xmake core file
 	@cp -p $(xmake_core) $(xmake_core_install)
-	@chmod 777 $(xmake_core_install)
+	@chmod 755 $(xmake_core_install)
 	@# install the xrepo bin file
 	@cp -p ./scripts/xrepo.sh $(xrepo_bin_install)
-	@chmod 777 $(xrepo_bin_install)
+	@chmod 755 $(xrepo_bin_install)
 	@# remove xmake.out
 	@if [ -f "$(TMP_DIR)/xmake.out" ]; then rm $(TMP_DIR)/xmake.out; fi
 	@# ok

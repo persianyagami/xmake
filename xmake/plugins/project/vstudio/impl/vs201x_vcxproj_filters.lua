@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      EnoroF, ruki
 -- @file        vs201x_vcxproj_filters.lua
@@ -38,6 +38,7 @@ function _make_header(filtersfile, vsinfo)
     ,   vs2015 = '14.0'
     ,   vs2017 = '15.0'
     ,   vs2019 = '16.0'
+    ,   vs2022 = '17.0'
     }
 
     -- make header

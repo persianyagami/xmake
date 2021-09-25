@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        check_cxxfuncs.lua
@@ -68,6 +68,8 @@ end
 --
 -- configvar_check_cxxfuncs("HAS_SETJMP", "setjmp", {includes = {"signal.h", "setjmp.h"}, links = {}})
 -- configvar_check_cxxfuncs("HAS_SETJMP", {"setjmp", "sigsetjmp{sigsetjmp((void*)0, 0);}"})
+-- configvar_check_cxxfuncs("HAS_SETJMP", "setjmp", {includes = {"setjmp.h"}, default = 0})
+-- configvar_check_cxxfuncs("CUSTOM_SETJMP=setjmp", "setjmp", {includes = {"setjmp.h"}, default = "", quote = false})
 --
 function configvar_check_cxxfuncs(definition, funcs, opt)
     opt = opt or {}
@@ -75,7 +77,9 @@ function configvar_check_cxxfuncs(definition, funcs, opt)
     local defname, defval = unpack(definition:split('='))
     option(optname)
         add_cxxfuncs(funcs)
-        set_configvar(defname, defval or 1)
+        if opt.default == nil then
+            set_configvar(defname, defval or 1, {quote = opt.quote})
+        end
         if opt.links then
             add_links(opt.links)
         end
@@ -98,5 +102,9 @@ function configvar_check_cxxfuncs(definition, funcs, opt)
             set_warnings(opt.warnings)
         end
     option_end()
-    add_options(optname)
+    if opt.default == nil then
+        add_options(optname)
+    else
+        set_configvar(defname, has_config(optname) and (defval or 1) or opt.default, {quote = opt.quote})
+    end
 end

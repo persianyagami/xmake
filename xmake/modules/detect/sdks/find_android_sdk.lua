@@ -12,18 +12,18 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_android_sdk.lua
 --
 
 -- imports
-import("lib.detect.cache")
 import("core.base.semver")
 import("core.base.option")
 import("core.base.global")
 import("core.project.config")
+import("core.cache.detectcache")
 import("lib.detect.find_directory")
 
 -- find sdk directory
@@ -95,7 +95,7 @@ function main(sdkdir, opt)
 
     -- attempt to load cache first
     local key = "detect.sdks.find_android_sdk"
-    local cacheinfo = cache.load(key)
+    local cacheinfo = detectcache:get(key) or {}
     if not opt.force and cacheinfo.sdk and cacheinfo.sdk.sdkdir and os.isdir(cacheinfo.sdk.sdkdir) then
         return cacheinfo.sdk
     end
@@ -123,8 +123,7 @@ function main(sdkdir, opt)
 
     -- save to cache
     cacheinfo.sdk = sdk or false
-    cache.save(key, cacheinfo)
-
-    -- ok?
+    detectcache:set(key, cacheinfo)
+    detectcache:save()
     return sdk
 end

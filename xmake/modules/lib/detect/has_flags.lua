@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        has_flags.lua
@@ -22,7 +22,7 @@
 import("core.base.option")
 import("core.base.scheduler")
 import("core.project.config")
-import("lib.detect.cache")
+import("core.cache.detectcache")
 import("lib.detect.find_tool")
 
 -- has the given flags for the current tool?
@@ -84,7 +84,7 @@ function main(name, flags, opt)
     end
 
     -- attempt to get result from cache first
-    local cacheinfo = cache.load("lib.detect.has_flags")
+    local cacheinfo = detectcache:get("lib.detect.has_flags") or {}
     local result = cacheinfo[key]
     if result ~= nil and not opt.force then
         return result
@@ -137,7 +137,8 @@ function main(name, flags, opt)
 
     -- save result to cache
     cacheinfo[key] = result
-    cache.save("lib.detect.has_flags", cacheinfo)
+    detectcache:set("lib.detect.has_flags", cacheinfo)
+    detectcache:save()
     return result
 end
 

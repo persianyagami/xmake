@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        build_files.lua
@@ -89,7 +89,7 @@ end
 function _add_batchjobs_for_target(batchjobs, rootjob, target, filepatterns)
 
     -- has been disabled?
-    if target:get("enabled") == false then
+    if not target:is_enabled() then
         return
     end
 
@@ -124,8 +124,7 @@ function _get_batchjobs(targetname, filepatterns)
         local depset = hashset.new()
         local targets = {}
         for _, target in pairs(project.targets()) do
-            local default = target:get("default")
-            if default == nil or default == true or option.get("all") then
+            if target:is_default() or option.get("all") then
                 for _, depname in ipairs(target:get("deps")) do
                     depset:insert(depname)
                 end
@@ -163,11 +162,7 @@ function _get_file_patterns(sourcefiles)
             local _excludes = {}
             for _, exclude in ipairs(excludes) do
                 exclude = path.translate(exclude)
-                exclude = exclude:gsub("([%+%.%-%^%$%(%)%%])", "%%%1")
-                exclude = exclude:gsub("%*%*", "\001")
-                exclude = exclude:gsub("%*", "\002")
-                exclude = exclude:gsub("\001", ".*")
-                exclude = exclude:gsub("\002", "[^/]*")
+                exclude = path.pattern(exclude)
                 table.insert(_excludes, exclude)
             end
             excludes = _excludes
@@ -206,8 +201,10 @@ function main(targetname, sourcefiles)
     local batchjobs = _get_batchjobs(targetname, filepatterns)
     if batchjobs and batchjobs:size() > 0 then
         local curdir = os.curdir()
-        runjobs("build_files", batchjobs, {comax = option.get("jobs") or 1, curdir = curdir})
+        runjobs("build_files", batchjobs, {comax = option.get("jobs") or 1, curdir = curdir, count_as_index = true})
         os.cd(curdir)
+    else
+        wprint("%s not found!", sourcefiles)
     end
 end
 

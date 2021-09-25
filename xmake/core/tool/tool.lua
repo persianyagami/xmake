@@ -12,7 +12,7 @@
 -- See the License for the specific tool governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        tool.lua
@@ -221,7 +221,7 @@ function tool.load(kind, opt)
     -- load toolchain instance
     local toolchain_inst
     if toolchain_info and toolchain_info.name then
-        toolchain_inst = toolchain.load(toolchain_info.name, {plat = plat, arch = arch})
+        toolchain_inst = toolchain.load(toolchain_info.name, {plat = plat, arch = arch, cachekey = toolchain_info.cachekey})
     end
 
     -- new an instance
@@ -229,11 +229,7 @@ function tool.load(kind, opt)
     if not instance then
         return nil, errors
     end
-
-    -- save instance to the cache
     tool._TOOLS[cachekey] = instance
-
-    -- ok
     return instance
 end
 

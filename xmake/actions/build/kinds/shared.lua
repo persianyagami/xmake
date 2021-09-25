@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        shared.lua
@@ -25,13 +25,14 @@ import("core.tool.linker")
 import("core.tool.compiler")
 import("core.project.depend")
 import("private.utils.progress")
+import("private.utils.batchcmds")
 import("object", {alias = "add_batchjobs_for_object"})
 
 -- do link target
 function _do_link_target(target, opt)
 
     -- load linker instance
-    local linkinst = linker.load(target:targetkind(), target:sourcekinds(), {target = target})
+    local linkinst = linker.load(target:kind(), target:sourcekinds(), {target = target})
 
     -- get link flags
     local linkflags = linkinst:linkflags({target = target})
@@ -42,7 +43,7 @@ function _do_link_target(target, opt)
     -- need build this target?
     local depfiles = objectfiles
     for _, dep in ipairs(target:orderdeps()) do
-        if dep:targetkind() == "static" then
+        if dep:kind() == "static" then
             if depfiles == objectfiles then
                 depfiles = table.copy(objectfiles)
             end
@@ -102,6 +103,13 @@ function _on_link_target(target, opt)
             on_link(target, opt)
             done = true
         end
+        local on_linkcmd = r:script("linkcmd")
+        if on_linkcmd then
+            local batchcmds_ = batchcmds.new({target = target})
+            on_linkcmd(target, batchcmds_, {progress = opt.progress})
+            batchcmds_:runcmds({dryrun = option.get("dry-run")})
+            done = true
+        end
     end
     if done then return end
 
@@ -124,6 +132,12 @@ function _link_target(target, opt)
         if before_link then
             before_link(target, opt)
         end
+        local before_linkcmd = r:script("linkcmd_before")
+        if before_linkcmd then
+            local batchcmds_ = batchcmds.new({target = target})
+            before_linkcmd(target, batchcmds_, {progress = opt.progress})
+            batchcmds_:runcmds({dryrun = option.get("dry-run")})
+        end
     end
 
     -- on link
@@ -141,6 +155,12 @@ function _link_target(target, opt)
         if after_link then
             after_link(target, opt)
         end
+        local after_linkcmd = r:script("linkcmd_after")
+        if after_linkcmd then
+            local batchcmds_ = batchcmds.new({target = target})
+            after_linkcmd(target, batchcmds_, {progress = opt.progress})
+            batchcmds_:runcmds({dryrun = option.get("dry-run")})
+        end
     end
 end
 
@@ -150,7 +170,7 @@ function main(batchjobs, rootjob, target)
     -- add link job
     local job_link = batchjobs:addjob(target:name() .. "/link", function (index, total)
         _link_target(target, {progress = (index * 100) / total})
-    end, rootjob)
+    end, {rootjob = rootjob})
 
     -- we need only return and depend the link job for each target,
     -- so we can compile the source files for each target in parallel

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        run.lua
@@ -87,9 +87,9 @@ end
 
 -- main entry
 function main (target, opt)
-    if is_plat("macosx") then
+    if target:is_plat("macosx") then
         _run_on_macosx(target, opt)
-    elseif is_plat("iphoneos") and is_arch("x86_64", "i386") then
+    elseif target:is_plat("iphoneos") and target:is_arch("x86_64", "i386") then
         _run_on_simulator(target, opt)
     else
         raise("we can only run application on macOS or simulator!")

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -35,16 +35,6 @@ platform("watchos")
     set_formats("object", "$(name).o")
     set_formats("shared", "lib$(name).dylib")
     set_formats("symbol", "$(name).dSYM")
-
-    -- on check
-    on_check(function (platform)
-        import("core.project.config")
-        local arch = config.get("arch")
-        if not arch then
-            config.set("arch", "armv7k")
-            cprint("checking for architecture ... ${color.success}%s", config.get("arch"))
-        end
-    end)
 
     -- set toolchains
     set_toolchains("envs", "xcode")

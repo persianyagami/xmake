@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -25,8 +25,8 @@ toolchain("gnu-rm")
     set_homepage("https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm")
     set_description("GNU Arm Embedded Toolchain")
 
-    -- mark as standalone toolchain
-    set_kind("standalone")
+    -- mark as cross-complation toolchain
+    set_kind("cross")
 
     -- on load
     on_load(function (toolchain)

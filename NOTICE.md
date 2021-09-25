@@ -1,5 +1,5 @@
 A cross-platform build utility based on Lua
-Copyright 2015-2020 The TBOOX Open Source Group
+Copyright 2015-present The TBOOX Open Source Group
 
 This product includes software developed by The TBOOX Open Source Group (https://tboox.org/).
 
@@ -44,6 +44,14 @@ which can be obtained at:
     * core/src/luajit/luajit/COPYRIGHT (MIT License)
   * HOMEPAGE:
     * http://luajit.org/
+
+This product depends on 'Lua', The Lua Programing Language,
+which can be obtained at:
+
+  * LICENSE:
+    * https://www.lua.org/license.html (MIT License)
+  * HOMEPAGE:
+    * http://lua.org/
 
 This product depends on 'tbox', The Treasure Box Library,
 which can be obtained at:

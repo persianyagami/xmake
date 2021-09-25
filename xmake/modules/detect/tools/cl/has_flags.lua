@@ -12,14 +12,14 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        has_flags.lua
 --
 
 -- imports
-import("lib.detect.cache")
+import("core.cache.detectcache")
 
 -- attempt to check it from the argument list
 function _check_from_arglist(flags, opt)
@@ -35,11 +35,8 @@ function _check_from_arglist(flags, opt)
     -- make allflags key
     local flagskey = opt.program .. "_" .. (opt.programver or "")
 
-    -- load cache
-    local cacheinfo  = cache.load(key)
-
     -- get all allflags from argument list
-    local allflags = cacheinfo[flagskey]
+    local allflags = detectcache:get2(key, flagskey)
     if not allflags then
 
         -- get argument list
@@ -52,11 +49,9 @@ function _check_from_arglist(flags, opt)
         end
 
         -- save cache
-        cacheinfo[flagskey] = allflags
-        cache.save(key, cacheinfo)
+        detectcache:set2(key, flagskey, allflags)
+        detectcache:save()
     end
-
-    -- ok?
     return allflags[flags[1]:gsub("/", "-")]
 end
 
@@ -64,7 +59,8 @@ end
 function _check_try_running(flags, opt)
 
     -- make an stub source file
-    local sourcefile = path.join(os.tmpdir(), "detect", "cl_has_flags.c")
+    local tmpdir = path.join(os.tmpdir(), "detect")
+    local sourcefile = path.join(tmpdir, "cl_has_flags.c")
     if not os.isfile(sourcefile) then
         io.writefile(sourcefile, "int main(int argc, char** argv)\n{return 0;}")
     end
@@ -72,7 +68,8 @@ function _check_try_running(flags, opt)
     -- check it
     local errors = nil
     return try  {   function ()
-                        local _, errs = os.iorunv(opt.program, table.join("-c", "-nologo", flags, "-Fo" .. os.nuldev(), sourcefile), {envs = opt.envs})
+                        local _, errs = os.iorunv(opt.program, table.join("-c", "-nologo", flags, "-Fo" .. os.nuldev(), sourcefile),
+                                            {envs = opt.envs, curdir = tmpdir}) -- we need switch to tmpdir to avoid generating some tmp files, e.g. /Zi -> vc140.pdb
                         if errs and #errs:trim() > 0 then
                             return false, errs
                         end

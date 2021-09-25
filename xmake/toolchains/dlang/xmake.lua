@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -35,7 +35,7 @@ toolchain("dlang")
         import("core.project.config")
 
         -- get cross prefix
-        local cross = config.get("cross") or ""
+        local cross = toolchain:cross() or ""
 
         -- set toolset
         toolchain:add("toolset", "dc",   "$(env DC)", "dmd", "ldc2", cross .. "gdc")

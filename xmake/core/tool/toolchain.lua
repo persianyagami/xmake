@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        toolchain.lua
@@ -31,17 +31,32 @@ local global         = require("base/global")
 local option         = require("base/option")
 local interpreter    = require("base/interpreter")
 local config         = require("project/config")
+local memcache       = require("cache/memcache")
+local localcache     = require("cache/localcache")
 local language       = require("language/language")
 local sandbox        = require("sandbox/sandbox")
 local sandbox_module = require("sandbox/modules/import/core/sandbox/module")
 
 -- new an instance
-function _instance.new(name, info, plat, arch)
-    local instance    = table.inherit(_instance)
-    instance._NAME    = name
-    instance._INFO    = info
-    instance._PLAT    = plat
-    instance._ARCH    = arch
+function _instance.new(name, info, cachekey, configs)
+    local instance     = table.inherit(_instance)
+    instance._NAME     = name
+    instance._INFO     = info
+    instance._CACHE    = toolchain._localcache()
+    instance._CACHEKEY = cachekey
+    instance._CONFIGS  = instance._CACHE:get(cachekey) or {}
+    for k, v in pairs(configs) do
+        instance._CONFIGS[k] = v
+    end
+    -- is global toolchain for the whole platform?
+    configs.plat = nil
+    configs.arch = nil
+    configs.cachekey = nil
+    local plat = config.get("plat") or os.host()
+    local arch = config.get("arch") or os.arch()
+    if instance:is_plat(plat) and instance:is_arch(arch) and #table.keys(configs) == 0 then
+        instance._CONFIGS.__global = true
+    end
     return instance
 end
 
@@ -52,12 +67,12 @@ end
 
 -- get toolchain platform
 function _instance:plat()
-    return self._PLAT
+    return self:config("plat")
 end
 
 -- get toolchain architecture
 function _instance:arch()
-    return self._ARCH
+    return self:config("arch")
 end
 
 -- the current platform is belong to the given platforms?
@@ -128,9 +143,23 @@ function _instance:kind()
     return self:info():get("kind")
 end
 
+-- is cross-compilation toolchain?
+function _instance:is_cross()
+    if self:kind() == "cross" then
+        return true
+    elseif self:kind() == "standalone" and (self:cross() or self:sdkdir()) then
+        return true
+    end
+end
+
 -- is standalone toolchain?
-function _instance:standalone()
-    return self:kind() == "standalone"
+function _instance:is_standalone()
+    return self:kind() == "standalone" or self:kind() == "cross"
+end
+
+-- is global toolchain for whole platform
+function _instance:is_global()
+    return self:config("__global")
 end
 
 -- get the run environments
@@ -175,12 +204,12 @@ end
 
 -- get the cross
 function _instance:cross()
-    return config.get("cross") or self:info():get("cross")
+    return self:config("cross") or config.get("cross") or self:info():get("cross")
 end
 
 -- get the bin directory
 function _instance:bindir()
-    local bindir = config.get("bin") or self:info():get("bindir")
+    local bindir = self:config("bindir") or config.get("bin") or self:info():get("bindir")
     if not bindir and self:cross() and self:sdkdir() and os.isdir(path.join(self:sdkdir(), "bin")) then
         bindir = path.join(self:sdkdir(), "bin")
     end
@@ -189,7 +218,28 @@ end
 
 -- get the sdk directory
 function _instance:sdkdir()
-    return config.get("sdk") or self:info():get("sdkdir")
+    return self:config("sdkdir") or config.get("sdk") or self:info():get("sdkdir")
+end
+
+-- get cachekey
+function _instance:cachekey()
+    return self._CACHEKEY
+end
+
+-- get user config from `set_toolchains("", {configs = {vs = "2018"}})`
+function _instance:config(name)
+    return self._CONFIGS[name]
+end
+
+-- set user config
+function _instance:config_set(name, data)
+    self._CONFIGS[name] = data
+end
+
+-- save user configs
+function _instance:configs_save()
+    self._CACHE:set(self:cachekey(), self._CONFIGS)
+    self._CACHE:save()
 end
 
 -- do check, we only check it once for all architectures
@@ -220,10 +270,31 @@ function _instance:load_cross_toolchain()
     return sandbox_module.import("toolchains.cross.load", {rootdir = os.programdir(), anonymous = true})(self)
 end
 
+-- get packages
+function _instance:packages()
+    local packages = self._PACKAGES
+    if packages == nil then
+        local project = require("project/project")
+        -- we will get packages from `set_toolchains("foo", {packages})` or `set_toolchains("foo@packages")`
+        for _, pkgname in ipairs(table.wrap(self:config("packages"))) do
+            local requires = project.required_packages()
+            if requires then
+                local pkginfo = requires[pkgname]
+                if pkginfo then
+                    packages = packages or {}
+                    table.insert(packages, pkginfo)
+                end
+            end
+        end
+        self._PACKAGES = packages or false
+    end
+    return packages or nil
+end
+
 -- on check (builtin)
 function _instance:_on_check()
     local on_check = self:info():get("check")
-    if not on_check and self:standalone() and (self:cross() or self:sdkdir()) then
+    if not on_check and self:is_cross() then
         on_check = self.check_cross_toolchain
     end
     return on_check
@@ -232,7 +303,7 @@ end
 -- on load (builtin)
 function _instance:_on_load()
     local on_load = self:info():get("load")
-    if not on_load and self:standalone() and (self:cross() or self:sdkdir()) then
+    if not on_load and self:is_cross() then
         on_load = self.load_cross_toolchain
     end
     return on_load
@@ -307,6 +378,13 @@ end
 -- check the given tool path
 function _instance:_checktool(toolkind, toolpath)
 
+    -- get result from cache first
+    local cachekey = self:cachekey() .. "_checktool" .. toolkind
+    local result = toolchain._memcache():get3(cachekey, toolkind, toolpath)
+    if result then
+        return result[1], result[2]
+    end
+
     -- get find_tool
     local find_tool = self._find_tool
     if not find_tool then
@@ -328,15 +406,22 @@ function _instance:_checktool(toolkind, toolpath)
         end
     end
 
-    -- init cache key
-    local cachekey = "toolchain_" .. self:plat() .. "_" .. self:arch()
+    -- contain toolname? parse it, e.g. 'gcc@xxxx.exe'
+    -- https://github.com/xmake-io/xmake/issues/1361
+    local program, toolname
+    if toolpath then
+        local pos = toolpath:find('@', 1, true)
+        if pos then
+            toolname = toolpath:sub(1, pos - 1)
+            program = toolpath:sub(pos + 1)
+        end
+    end
 
     -- find tool program
-    local program, toolname
-    local tool = find_tool(toolpath, {cachekey = cachekey, program = toolpath, paths = self:bindir(), envs = self:get("runenvs")})
+    local tool = find_tool(toolpath, {cachekey = cachekey, program = program or toolpath, paths = self:bindir(), envs = self:get("runenvs")})
     if tool then
         program = tool.program
-        toolname = tool.name
+        toolname = toolname or tool.name
     end
 
     -- get tool description from the tool kind
@@ -350,7 +435,18 @@ function _instance:_checktool(toolkind, toolpath)
             utils.cprint("${dim}checking for %s (%s: ${bright}%s${clear}) ... ${color.nothing}${text.nothing}", description, toolkind, toolpath)
         end
     end
+    toolchain._memcache():set3(cachekey, toolkind, toolpath, {program, toolname})
     return program, toolname
+end
+
+-- get memcache
+function toolchain._memcache()
+    return memcache.cache("core.tool.toolchain")
+end
+
+-- get local cache
+function toolchain._localcache()
+    return localcache.cache("toolchain")
 end
 
 -- the interpreter
@@ -373,9 +469,38 @@ function toolchain._interpreter()
 
     -- save interpreter
     toolchain._INTERPRETER = interp
-
-    -- ok?
     return interp
+end
+
+-- get cache key
+function toolchain._cachekey(name, opt)
+    local cachekey = opt.cachekey
+    if not cachekey then
+        cachekey = name
+        for _, k in ipairs(table.orderkeys(opt)) do
+            local v = opt[k]
+            cachekey = cachekey .. "_" .. k .. "_" .. tostring(v)
+        end
+    end
+    return cachekey
+end
+
+-- parse toolchain and package name
+--
+-- format: toolchain@package
+-- e.g. "clang@llvm-10", "@muslcc", zig
+--
+function toolchain.parsename(name)
+    local splitinfo = name:split('@', {plain = true, strict = true})
+    local toolchain_name = splitinfo[1]
+    if toolchain_name == "" then
+        toolchain_name = nil
+    end
+    local packages = splitinfo[2]
+    if packages == "" then
+        packages = nil
+    end
+    return toolchain_name or packages, packages
 end
 
 -- get toolchain apis
@@ -419,19 +544,25 @@ function toolchain.directories()
     return dirs
 end
 
--- load the given toolchain
+-- load toolchain
 function toolchain.load(name, opt)
 
-    -- init cache key
+    -- get toolchain name and packages
     opt = opt or {}
-    local plat = opt.plat or config.get("plat") or os.host()
-    local arch = opt.arch or config.get("arch") or os.arch()
-    local cachekey = name .. plat .. arch
+    local packages
+    name, packages = toolchain.parsename(name)
+    opt.packages = opt.packages or packages
+
+    -- get cache
+    opt.plat = opt.plat or config.get("plat") or os.host()
+    opt.arch = opt.arch or config.get("arch") or os.arch()
+    local cache = toolchain._memcache()
+    local cachekey = toolchain._cachekey(name, opt)
 
     -- get it directly from cache dirst
-    toolchain._TOOLCHAINS = toolchain._TOOLCHAINS or {}
-    if toolchain._TOOLCHAINS[cachekey] then
-        return toolchain._TOOLCHAINS[cachekey]
+    local instance = cache:get(cachekey)
+    if instance then
+        return instance
     end
 
     -- find the toolchain script path
@@ -468,17 +599,136 @@ function toolchain.load(name, opt)
     end
 
     -- save instance to the cache
-    local instance = _instance.new(name, result, plat, arch)
-    toolchain._TOOLCHAINS[cachekey] = instance
+    instance = _instance.new(name, result, cachekey, opt)
+    cache:set(cachekey, instance)
     return instance
 end
 
--- new toolchain
-function toolchain.new(name, info, opt)
+-- load toolchain from the give toolchain info
+function toolchain.load_withinfo(name, info, opt)
+
+    -- get toolchain name and packages
+    opt = opt or {}
+    local packages
+    name, packages = toolchain.parsename(name)
+    opt.packages = opt.packages or packages
+
+    -- get cache key
+    opt.plat = opt.plat or config.get("plat") or os.host()
+    opt.arch = opt.arch or config.get("arch") or os.arch()
+    local cache = toolchain._memcache()
+    local cachekey = toolchain._cachekey(name, opt)
+
+    -- get it directly from cache dirst
+    local instance = cache:get(cachekey)
+    if instance then
+        return instance
+    end
+
+    -- save instance to the cache
+    instance = _instance.new(name, info, cachekey, opt)
+    cache:set(cachekey, instance)
+    return instance
+end
+
+-- get the program and name of the given tool kind
+function toolchain.tool(toolchains, toolkind, opt)
+
+    -- get plat and arch
     opt = opt or {}
     local plat = opt.plat or config.get("plat") or os.host()
     local arch = opt.arch or config.get("arch") or os.arch()
-    return _instance.new(name, info, plat, arch)
+
+    -- get cache and cachekey
+    local cache = toolchain._localcache()
+    local cachekey = "tool_" .. (opt.cachekey or "") .. "_" .. plat .. "_" .. arch .. "_" .. toolkind
+    local updatecache = false
+
+    -- get program from before_script
+    local program, toolname, toolchain_info
+    local before_get = opt.before_get
+    if before_get then
+        program, toolname, toolchain_info = before_get(toolkind)
+        if program then
+            updatecache = true
+        end
+    end
+
+    -- get program from local cache
+    if not program then
+        program = cache:get2(cachekey, "program")
+        toolname = cache:get2(cachekey, "toolname")
+        toolchain_info = cache:get2(cachekey, "toolchain_info")
+    end
+
+    -- get program from toolchains
+    if not program then
+        for idx, toolchain_inst in ipairs(toolchains) do
+            program, toolname = toolchain_inst:tool(toolkind)
+            if program then
+                toolchain_info = {name = toolchain_inst:name(),
+                                  plat = toolchain_inst:plat(),
+                                  arch = toolchain_inst:arch(),
+                                  cachekey = toolchain_inst:cachekey()}
+                updatecache = true
+                break
+            end
+        end
+    end
+
+    -- contain toolname? parse it, e.g. 'gcc@xxxx.exe'
+    if program and type(program) == "string" then
+        local pos = program:find('@', 1, true)
+        if pos then
+            toolname = program:sub(1, pos - 1)
+            program = program:sub(pos + 1)
+            updatecache = true
+        end
+    end
+
+    -- update cache
+    if program and updatecache then
+        cache:set2(cachekey, "program", program)
+        cache:set2(cachekey, "toolname", toolname)
+        cache:set2(cachekey, "toolchain_info", toolchain_info)
+        cache:save()
+    end
+    return program, toolname, toolchain_info
+end
+
+-- get tool configuration from the toolchains
+function toolchain.toolconfig(toolchains, name, opt)
+
+    -- get plat and arch
+    opt = opt or {}
+    local plat = opt.plat or config.get("plat") or os.host()
+    local arch = opt.arch or config.get("arch") or os.arch()
+
+    -- get cache and cachekey
+    local cache = toolchain._memcache()
+    local cachekey = "toolconfig_" .. (opt.cachekey or "") .. "_" .. plat .. "_" .. arch
+
+    -- get configuration
+    local toolconfig = cache:get2(cachekey, name)
+    if toolconfig == nil then
+        for _, toolchain_inst in ipairs(toolchains) do
+            local values = toolchain_inst:get(name)
+            if values then
+                toolconfig = toolconfig or {}
+                table.join2(toolconfig, values)
+            end
+            local after_get = opt.after_get
+            if after_get then
+                values = after_get(toolchain_inst, name)
+                if values then
+                    toolconfig = toolconfig or {}
+                    table.join2(toolconfig, values)
+                end
+            end
+        end
+        cache:set2(cachekey, name, toolconfig or false)
+    end
+    return toolconfig or nil
 end
 
 -- return module

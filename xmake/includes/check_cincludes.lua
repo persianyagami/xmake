@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        check_cincludes.lua
@@ -30,6 +30,9 @@ function check_cincludes(definition, includes, opt)
     local optname = "__" .. (opt.name or definition)
     option(optname)
         add_cincludes(includes)
+        if opt.includedirs then
+            add_includedirs(opt.includedirs)
+        end
         add_defines(definition)
     option_end()
     add_options(optname)
@@ -40,6 +43,7 @@ end
 -- e.g.
 --
 -- configvar_check_cincludes("HAS_STRING_H", "string.h")
+-- configvar_check_cincludes("HAS_STRING_H", "string.h", {default = 0})
 -- configvar_check_cincludes("HAS_STRING_AND_STDIO_H", {"string.h", "stdio.h"})
 --
 function configvar_check_cincludes(definition, includes, opt)
@@ -48,7 +52,16 @@ function configvar_check_cincludes(definition, includes, opt)
     local defname, defval = unpack(definition:split('='))
     option(optname)
         add_cincludes(includes)
-        set_configvar(defname, defval or 1)
+        if opt.includedirs then
+            add_includedirs(opt.includedirs)
+        end
+        if opt.default == nil then
+            set_configvar(defname, defval or 1, {quote = opt.quote})
+        end
     option_end()
-    add_options(optname)
+    if opt.default == nil then
+        add_options(optname)
+    else
+        set_configvar(defname, has_config(optname) and (defval or 1) or opt.default, {quote = opt.quote})
+    end
 end

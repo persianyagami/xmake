@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        vs201x_vcxproj.lua
@@ -39,10 +39,8 @@ function _get_toolset_ver(targetinfo, vsinfo)
     return toolset_ver
 end
 
--- get platform sdk version
+-- get platform sdk version from vcvars.WindowsSDKVersion
 function _get_platform_sdkver(target, vsinfo)
-
-    -- get sdk version for vcvarsall[arch].WindowsSDKVersion
     local sdkver = nil
     for _, targetinfo in ipairs(target.info) do
         sdkver = targetinfo.sdkver
@@ -50,8 +48,6 @@ function _get_platform_sdkver(target, vsinfo)
             break
         end
     end
-
-    -- done
     return sdkver or vsinfo.sdk_version
 end
 
@@ -66,7 +62,11 @@ function _make_compcmd(compargv, sourcefile, objectfile, vcxprojdir)
         v = v:gsub("__objectfile__", objectfile)
         -- -Idir or /Idir
         v = v:gsub("([%-/]I)(.*)", function (I, dir)
-                dir = path.translate(dir:trim())
+                dir = dir:trim()
+                if #dir == 0 then
+                    return ""
+                end
+                dir = path.translate(dir)
                 if not path.is_absolute(dir) then
                     dir = path.relative(path.absolute(dir), vcxprojdir)
                 end
@@ -86,7 +86,11 @@ function _make_compflags(sourcefile, targetinfo, vcxprojdir)
 
         -- -Idir or /Idir
         flag = flag:gsub("[%-/]I(.*)", function (dir)
-                        dir = path.translate(dir:trim())
+                        dir = dir:trim()
+                        if #dir == 0 then
+                            return ""
+                        end
+                        dir = path.translate(dir)
                         if not path.is_absolute(dir) then
                             dir = path.relative(path.absolute(dir), vcxprojdir)
                         end
@@ -114,7 +118,11 @@ function _make_linkflags(targetinfo, vcxprojdir)
 
         -- replace -libpath:dir or /libpath:dir
         flag = flag:gsub(string.ipattern("[%-/]libpath:(.*)"), function (dir)
-                        dir = path.translate(dir:trim())
+                        dir = dir:trim()
+                        if #dir == 0 then
+                            return ""
+                        end
+                        dir = path.translate(dir)
                         if not path.is_absolute(dir) then
                             dir = path.relative(path.absolute(dir), vcxprojdir)
                         end
@@ -123,7 +131,11 @@ function _make_linkflags(targetinfo, vcxprojdir)
 
         -- replace -def:dir or /def:dir
         flag = flag:gsub(string.ipattern("[%-/]def:(.*)"), function (dir)
-                        dir = path.translate(dir:trim())
+                        dir = dir:trim()
+                        if #dir == 0 then
+                            return ""
+                        end
+                        dir = path.translate(dir)
                         if not path.is_absolute(dir) then
                             dir = path.relative(path.absolute(dir), vcxprojdir)
                         end
@@ -309,7 +321,7 @@ function _make_source_options(vcxprojfile, flags, condition)
         vcxprojfile:print("<RuntimeLibrary%s>MultiThreadedDLL</RuntimeLibrary>", condition)
     elseif flagstr:find("[%-/]MTd") then
         vcxprojfile:print("<RuntimeLibrary%s>MultiThreadedDebug</RuntimeLibrary>", condition)
-    elseif flagstr:find("[%-/]MT") then
+    else
         vcxprojfile:print("<RuntimeLibrary%s>MultiThreaded</RuntimeLibrary>", condition)
     end
 
@@ -439,6 +451,7 @@ function _make_common_item(vcxprojfile, vsinfo, target, targetinfo, vcxprojdir)
             if pcoutputfile then
                 vcxprojfile:print("<PrecompiledHeaderOutputFile>%s</PrecompiledHeaderOutputFile>", path.relative(path.absolute(pcoutputfile), vcxprojdir))
             end
+            vcxprojfile:print("<ForcedIncludeFiles>%s;%%(ForcedIncludeFiles)</ForcedIncludeFiles>", path.filename(pcheader))
         end
 
     vcxprojfile:leave("</ClCompile>")
@@ -739,10 +752,14 @@ function _make_source_files(vcxprojfile, vsinfo, target, vcxprojdir)
 
     vcxprojfile:leave("</ItemGroup>")
 
-    -- add headers
+    -- add header files
+    local pcheader = target.pcxxheader or target.pcheader
     vcxprojfile:enter("<ItemGroup>")
         for _, includefile in ipairs(target.headerfiles) do
-            _make_header_file(vcxprojfile, includefile, vcxprojdir)
+            -- we need ignore pcheader file to fix https://github.com/xmake-io/xmake/issues/1171
+            if not pcheader or includefile ~= pcheader then
+                _make_header_file(vcxprojfile, includefile, vcxprojdir)
+            end
         end
     vcxprojfile:leave("</ItemGroup>")
 end

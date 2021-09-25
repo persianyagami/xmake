@@ -12,81 +12,53 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define language
 language("rust")
-
-    -- set source file kinds
+    add_rules("rust")
     set_sourcekinds {rc = ".rs"}
-
-    -- set source file flags
     set_sourceflags {rc = "rcflags"}
-
-    -- set target kinds
     set_targetkinds {binary = "rcld", static = "rcar", shared = "rcsh"}
-
-    -- set target flags
     set_targetflags {binary = "ldflags", static = "arflags", shared = "shflags"}
-
-    -- set language kinds
     set_langkinds {rust = "rc"}
-
-    -- set mixing kinds
     set_mixingkinds("rc")
 
-    -- add rules
-    add_rules("rust")
-
-    -- on load
     on_load("load")
-
-    -- on check_main
     on_check_main("check_main")
 
-    -- set name flags
-    set_nameflags
-    {
-        object =
-        {
+    set_nameflags {
+        object = {
             "target.symbols"
         ,   "target.warnings"
         ,   "target.optimize:check"
         ,   "target.vectorexts:check"
         }
-    ,   binary =
-        {
+    ,   binary = {
             "config.linkdirs"
         ,   "target.linkdirs"
         ,   "target.rpathdirs"
         ,   "target.strip"
         ,   "target.symbols"
-        ,   "option.linkdirs"
-        ,   "option.rpathdirs"
         ,   "toolchain.linkdirs"
         ,   "toolchain.rpathdirs"
         }
-    ,   shared =
-        {
+    ,   shared = {
             "config.linkdirs"
         ,   "target.linkdirs"
         ,   "target.strip"
         ,   "target.symbols"
-        ,   "option.linkdirs"
         ,   "toolchain.linkdirs"
         }
-    ,   static =
-        {
+    ,   static = {
             "target.strip"
         ,   "target.symbols"
         }
     }
 
-    -- set menu
     set_menu {
                 config =
                 {

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        ninja.lua
@@ -26,7 +26,7 @@ import("lib.detect.find_tool")
 function build(package, configs, opt)
     opt = opt or {}
     local buildir = opt.buildir or os.curdir()
-    local njob = tostring(math.ceil(os.cpuinfo().ncpu * 3 / 2))
+    local njob = opt.jobs or option.get("jobs") or tostring(os.default_njob())
     local ninja = assert(find_tool("ninja"), "ninja not found!")
     local argv = {"-C", buildir}
     if option.get("verbose") then
@@ -44,7 +44,7 @@ end
 function install(package, configs, opt)
     opt = opt or {}
     local buildir = opt.buildir or os.curdir()
-    local njob = tostring(math.ceil(os.cpuinfo().ncpu * 3 / 2))
+    local njob = tostring(os.default_njob())
     local ninja = assert(find_tool("ninja"), "ninja not found!")
     local argv = {"install", "-C", buildir}
     if option.get("verbose") then

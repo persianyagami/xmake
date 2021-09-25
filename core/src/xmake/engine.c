@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        engine.c
@@ -33,7 +33,7 @@
 #   include <windows.h>
 #   include <io.h>
 #   include <fcntl.h>
-#elif defined(TB_CONFIG_OS_MACOSX)
+#elif defined(TB_CONFIG_OS_MACOSX) || defined(TB_CONFIG_OS_IOS)
 #   include <unistd.h>
 #   include <mach-o/dyld.h>
 #elif defined(TB_CONFIG_OS_LINUX) || defined(TB_CONFIG_OS_BSD) || defined(TB_CONFIG_OS_ANDROID)
@@ -185,6 +185,8 @@ tb_int_t xm_winos_ansi_cp(lua_State* lua);
 tb_int_t xm_winos_oem_cp(lua_State* lua);
 tb_int_t xm_winos_logical_drives(lua_State* lua);
 tb_int_t xm_winos_registry_query(lua_State* lua);
+tb_int_t xm_winos_registry_keys(lua_State* lua);
+tb_int_t xm_winos_registry_values(lua_State* lua);
 #endif
 
 // the string functions
@@ -218,6 +220,16 @@ tb_int_t xm_semver_parse(lua_State* lua);
 tb_int_t xm_semver_compare(lua_State* lua);
 tb_int_t xm_semver_satisfies(lua_State* lua);
 tb_int_t xm_semver_select(lua_State* lua);
+
+// the libc functions
+tb_int_t xm_libc_malloc(lua_State* lua);
+tb_int_t xm_libc_free(lua_State* lua);
+tb_int_t xm_libc_memcpy(lua_State* lua);
+tb_int_t xm_libc_memset(lua_State* lua);
+tb_int_t xm_libc_strndup(lua_State* lua);
+tb_int_t xm_libc_dataptr(lua_State* lua);
+tb_int_t xm_libc_byteof(lua_State* lua);
+tb_int_t xm_libc_setbyte(lua_State* lua);
 
 #ifdef XM_CONFIG_API_HAVE_CURSES
 // register curses
@@ -287,6 +299,8 @@ static luaL_Reg const g_winos_functions[] =
 ,   { "ansi_cp",             xm_winos_ansi_cp           }
 ,   { "logical_drives",      xm_winos_logical_drives    }
 ,   { "registry_query",      xm_winos_registry_query    }
+,   { "registry_keys",       xm_winos_registry_keys     }
+,   { "registry_values",     xm_winos_registry_values   }
 ,   { tb_null,               tb_null                    }
 };
 #endif
@@ -408,6 +422,20 @@ static luaL_Reg const g_semver_functions[] =
 ,   { tb_null,          tb_null             }
 };
 
+// the libc functions
+static luaL_Reg const g_libc_functions[] =
+{
+    { "malloc",         xm_libc_malloc      }
+,   { "free",           xm_libc_free        }
+,   { "memcpy",         xm_libc_memcpy      }
+,   { "memset",         xm_libc_memset      }
+,   { "strndup",        xm_libc_strndup     }
+,   { "dataptr",        xm_libc_dataptr     }
+,   { "byteof",         xm_libc_byteof      }
+,   { "setbyte",        xm_libc_setbyte     }
+,   { tb_null,          tb_null             }
+};
+
 /* //////////////////////////////////////////////////////////////////////////////////////
  * private implementation
  */
@@ -479,7 +507,7 @@ static tb_size_t xm_engine_get_program_file(xm_engine_t* engine, tb_char_t* path
         // ok
         ok = tb_true;
 
-#elif defined(TB_CONFIG_OS_MACOSX)
+#elif defined(TB_CONFIG_OS_MACOSX) || defined(TB_CONFIG_OS_IOS)
         /*
          * _NSGetExecutablePath() copies the path of the main executable into the buffer. The bufsize parameter
          * should initially be the size of the buffer.  The function returns 0 if the path was successfully copied,
@@ -548,7 +576,7 @@ static tb_bool_t xm_engine_get_program_directory(xm_engine_t* engine, tb_char_t*
         if (programfile)
         {
             // get real program file path from the symbol link
-#ifndef TB_CONFIG_OS_WINDOWS
+#if !defined(TB_CONFIG_OS_WINDOWS) && !defined(TB_CONFIG_OS_IOS)
             tb_char_t programpath[TB_PATH_MAXN];
             tb_long_t size = readlink(programfile, programpath, sizeof(programpath));
             if (size >= 0 && size < sizeof(programpath))
@@ -810,7 +838,7 @@ xm_engine_ref_t xm_engine_init(tb_char_t const* name, xm_engine_lni_initalizer_c
         tb_strlcpy(engine->name, name, sizeof(engine->name));
 
         // init lua
-        engine->lua = lua_open();
+        engine->lua = luaL_newstate();
         tb_assert_and_check_break(engine->lua);
 
         // open lua libraries
@@ -850,6 +878,9 @@ xm_engine_ref_t xm_engine_init(tb_char_t const* name, xm_engine_lni_initalizer_c
         // bind semver functions
         luaL_register(engine->lua, "semver", g_semver_functions);
 
+        // bind libc functions
+        luaL_register(engine->lua, "libc", g_libc_functions);
+
 #ifdef XM_CONFIG_API_HAVE_CURSES
         // bind curses
         xm_curses_register(engine->lua);
@@ -887,6 +918,14 @@ xm_engine_ref_t xm_engine_init(tb_char_t const* name, xm_engine_lni_initalizer_c
         // init engine name
         lua_pushstring(engine->lua, name? name : "xmake");
         lua_setglobal(engine->lua, "_NAME");
+
+        // use luajit as runtime?
+#ifdef USE_LUAJIT
+        lua_pushboolean(engine->lua, tb_true);
+#else
+        lua_pushboolean(engine->lua, tb_false);
+#endif
+        lua_setglobal(engine->lua, "_LUAJIT");
 
         // init namespace: xmake
         lua_newtable(engine->lua);

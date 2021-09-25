@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      OpportunityLiu
 -- @file        render.lua
@@ -22,9 +22,9 @@ function _fill(opt, parmas)
     return function(match)
         local imp = match:match("^Import%((.+)%)$")
         if imp then
-            local func, overload = os.files(path.join(opt.templatedir, imp .. "(*)"))
-            assert(overload == 1)
-            func = func[1]
+            local funcs = os.files(path.join(opt.templatedir, imp .. "(*)"))
+            assert(#funcs == 1)
+            local func = funcs[1]
             local args = path.filename(func):match("%((.+)%)$"):split(",")
             return _render(func, opt, args)
         end

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -31,30 +31,11 @@ platform("mingw")
     set_archs("i386", "x86_64", "arm", "arm64")
 
     -- set formats
-    set_formats("static", "$(name).lib")
+    set_formats("static", "lib$(name).a")
     set_formats("object", "$(name).obj")
-    set_formats("shared", "$(name).dll")
+    set_formats("shared", "lib$(name).dll")
     set_formats("binary", "$(name).exe")
     set_formats("symbol", "$(name).pdb")
-
-    -- on check
-    on_check(function (platform)
-        import("core.project.config")
-        local arch = config.get("arch")
-        if not arch then
-            local mingw_chost = nil
-            if is_subhost("msys") then
-                mingw_chost = os.getenv("MINGW_CHOST")
-            end
-            if mingw_chost == "i686-w64-mingw32" then
-                arch = "i386"
-            else
-                arch = "x86_64"
-            end
-            config.set("arch", arch)
-            cprint("checking for architecture ... ${color.success}%s", config.get("arch"))
-        end
-    end)
 
     -- set toolchains
     set_toolchains("envs", "mingw", "yasm", "nasm", "fasm", "go")

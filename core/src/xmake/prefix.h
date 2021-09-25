@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        prefix.h
@@ -32,9 +32,15 @@
 #   define LUA_API extern "C"
 #   define LUALIB_API	LUA_API
 #endif
-#include "luajit.h"
-#include "lualib.h"
-#include "lauxlib.h"
+#ifdef USE_LUAJIT
+#   include "luajit.h"
+#   include "lualib.h"
+#   include "lauxlib.h"
+#else
+#   include "lua.h"
+#   include "lualib.h"
+#   include "lauxlib.h"
+#endif
 
 /* //////////////////////////////////////////////////////////////////////////////////////
  * private interfaces

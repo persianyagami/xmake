@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        object.lua
@@ -114,6 +114,6 @@ function main(target, batchjobs, sourcebatch, opt)
         batchjobs:addjob(sourcefile, function (index, total)
             local build_opt = table.join({objectfile = objectfile, dependfile = dependfile, sourcekind = sourcekind, progress = (index * 100) / total}, opt)
             _build_object(target, sourcefile, build_opt)
-        end, rootjob)
+        end, {rootjob = rootjob})
     end
 end

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        task.lua
@@ -54,7 +54,7 @@ function sandbox_core_base_task.run(taskname, options, ...)
 
     -- get task instance
     local taskname = option.taskname() or "build"
-    local taskinst = project.task(taskname) or task.task(taskname)
+    local taskinst = task.task(taskname) or project.task(taskname)
     if not taskinst then
         raise("do unknown task(%s)!", taskname)
     end

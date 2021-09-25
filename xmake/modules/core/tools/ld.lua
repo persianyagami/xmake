@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        ld.lua
@@ -65,17 +65,15 @@ end
 
 -- make the linkdir flag
 function nf_linkdir(self, dir)
-    return "-L" .. os.args(path.translate(dir))
+    return {"-L", path.translate(dir)}
 end
 
 -- make the link arguments list
 function linkargv(self, objectfiles, targetkind, targetfile, flags, opt)
-
-    -- init arguments
     opt = opt or {}
     local argv = table.join("-o", targetfile, objectfiles, flags)
     if is_host("windows") and not opt.rawargs then
-        argv = winos.cmdargv(argv)
+        argv = winos.cmdargv(argv, {escape = true})
     end
     return self:program(), argv
 end

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        jobpool.lua
@@ -39,10 +39,11 @@ end
 --
 -- @param name      the job name
 -- @param run       the run command/script
--- @param rootjob   the root job node (optional)
+-- @param opt       the options (rootjob)
 --
-function jobpool:addjob(name, run, rootjob)
-    return self:add({name = name, run = run}, rootjob)
+function jobpool:addjob(name, run, opt)
+    opt = opt or {}
+    return self:add({name = name, run = run}, opt.rootjob)
 end
 
 -- add job to the given job node

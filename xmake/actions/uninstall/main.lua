@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -81,7 +81,7 @@ function main()
                 if sudo.has() and option.get("admin") then
 
                     -- uninstall target with administrator permission
-                    sudo.runl(path.join(os.scriptdir(), "uninstall_admin.lua"), {targetname or "__all", option.get("installdir"), option.get("prefix")})
+                    sudo.execl(path.join(os.scriptdir(), "uninstall_admin.lua"), {targetname or "__all", option.get("installdir"), option.get("prefix")})
 
                     -- trace
                     cprint("${color.success}uninstall ok!")

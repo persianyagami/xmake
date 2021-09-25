@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        platform.lua
@@ -27,12 +27,11 @@ local raise     = require("sandbox/modules/raise")
 
 -- load the current platform
 function sandbox_core_platform.load(plat, arch)
-
-    -- load the platform configure
-    local ok, errors = platform.load(plat, arch)
-    if not ok then
+    local instance, errors = platform.load(plat, arch)
+    if not instance then
         raise(errors)
     end
+    return instance
 end
 
 -- get the platform os

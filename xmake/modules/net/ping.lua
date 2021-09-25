@@ -12,16 +12,15 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        ping.lua
 --
 
 -- imports
-import("lib.detect.cache")
+import("core.cache.detectcache")
 import("detect.tools.find_ping")
-import("detect.tools.find_nmap")
 import("private.async.runjobs")
 
 -- send ping to hosts
@@ -45,7 +44,7 @@ function main(hosts, opt)
     -- do not force ping? enable cache
     local cacheinfo = nil
     if not opt.force then
-        cacheinfo = cache.load("net.ping")
+        cacheinfo = detectcache:get("net.ping")
     end
 
     -- run tasks
@@ -78,21 +77,6 @@ function main(hosts, opt)
                 if data then
                     timeval = data:match("time=([%d%s%.]-)ms", 1, true) or data:match("=([%d%s%.]-)ms TTL", 1, true) or "65535"
                 end
-                if timeval == "65535" then
-                    local nmap = find_nmap()
-                    if nmap then
-                        data = try { function() return os.iorun("%s -T5 --max-retries 1 -p 80 --max-rtt-timeout 1 %s", nmap, host) end }
-                        if data then
-                            local timeval_s = data:match("in ([%d%.]-) seconds")
-                            if timeval_s then
-                                timeval_s = tonumber(timeval_s:trim()) * 1000
-                                if timeval_s > 0 then
-                                    timeval = tostring(timeval_s)
-                                end
-                            end
-                        end
-                    end
-                end
 
                 -- save results
                 if timeval then
@@ -104,17 +88,16 @@ function main(hosts, opt)
                 end
 
                 -- trace
-                vprint("pinging for the host(%s) ... %d ms", host, timeval)
+                vprint("pinging for the host(%s) ... %d ms", host, math.floor(timeval))
             end
         end
     end, {total = #hosts})
 
     -- save cache
     if cacheinfo then
-        cache.save("net.ping", cacheinfo)
+        detectcache:set("net.ping", cacheinfo)
+        detectcache:save()
     end
-
-    -- ok?
     return results
 end
 

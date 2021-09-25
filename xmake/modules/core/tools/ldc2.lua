@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki, BarrOff
 -- @file        ldc2.lua
@@ -47,4 +47,12 @@ function nf_optimize(self, level)
     return maps[level]
 end
 
+-- make the symbol flag
+function nf_symbol(self, level)
+    local maps =
+    {
+        debug = "-g --d-debug"
+    }
+    return maps[level]
+end
 

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_package.lua
@@ -67,7 +67,7 @@ function main(name, opt)
         if pkgdir then
             local links = {}
             for _, libraryfile in ipairs(os.files(path.join(pkgdir, libpattern))) do
-                table.insert(links, target.linkname(path.filename(libraryfile)))
+                table.insert(links, target.linkname(path.filename(libraryfile), {plat = opt.plat}))
             end
             local includedirs = {}
             local dubjson = path.join(pkgdir, "dub.json")

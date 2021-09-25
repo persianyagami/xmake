@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        check_ctypes.lua
@@ -55,6 +55,8 @@ end
 -- e.g.
 --
 -- configvar_check_ctypes("HAS_WCHAR", "wchar_t")
+-- configvar_check_ctypes("HAS_WCHAR", "wchar_t", {default = 0})
+-- configvar_check_ctypes("CUSTOM_WCHAR=wchar_t", "wchar_t", {default = "", quote = false})
 -- configvar_check_ctypes("HAS_WCHAR_AND_FLOAT", {"wchar_t", "float"})
 --
 function configvar_check_ctypes(definition, types, opt)
@@ -63,7 +65,9 @@ function configvar_check_ctypes(definition, types, opt)
     local defname, defval = unpack(definition:split('='))
     option(optname)
         add_ctypes(types)
-        set_configvar(defname, defval or 1)
+        if opt.default == nil then
+            set_configvar(defname, defval or 1, {quote = opt.quote})
+        end
         if opt.languages then
             set_languages(opt.languages)
         end
@@ -80,5 +84,9 @@ function configvar_check_ctypes(definition, types, opt)
             add_cincludes(opt.includes)
         end
     option_end()
-    add_options(optname)
+    if opt.default == nil then
+        add_options(optname)
+    else
+        set_configvar(defname, has_config(optname) and (defval or 1) or opt.default, {quote = opt.quote})
+    end
 end

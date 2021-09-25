@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        table.lua
@@ -21,9 +21,37 @@
 -- define module: table
 local table = table or {}
 
--- import jit function
-table.clear = require("table.clear")
-table.new   = require("table.new")
+-- clear table
+if not table.clear then
+    if xmake._LUAJIT then
+        table.clear = require("table.clear")
+    else
+        function table.clear(t)
+            for k, v in pairs(t) do
+                t[k] = nil
+            end
+        end
+    end
+end
+
+-- new table
+if not table.new then
+    if xmake._LUAJIT then
+        table.new = require("table.new")
+    else
+        function table.new(narray, nhash)
+            -- TODO
+            return {}
+        end
+    end
+end
+
+-- get array length
+if not table.getn then
+    function table.getn(t)
+        return #t
+    end
+end
 
 -- move values of table(a1) to table(a2)
 --
@@ -240,23 +268,44 @@ end
 
 -- remove repeat from the given array
 function table.unique(array, barrier)
-
     if table.is_array(array) then
         if table.getn(array) ~= 1 then
             local exists = {}
             local unique = {}
             for _, v in ipairs(array) do
-
                 -- exists barrier? clear the current existed items
                 if barrier and barrier(v) then
                     exists = {}
                 end
-
                 -- add unique item
                 if not exists[v] then
-                    -- v will not be nil
                     exists[v] = true
                     table.insert(unique, v)
+                end
+            end
+            array = unique
+        end
+    end
+    return array
+end
+
+-- reverse to remove repeat from the given array
+function table.reverse_unique(array, barrier)
+    if table.is_array(array) then
+        if table.getn(array) ~= 1 then
+            local exists = {}
+            local unique = {}
+            local n = #array
+            for i = 1, n do
+                local v = array[n - i + 1]
+                -- exists barrier? clear the current existed items
+                if barrier and barrier(v) then
+                    exists = {}
+                end
+                -- add unique item
+                if not exists[v] then
+                    exists[v] = true
+                    table.insert(unique, 1, v)
                 end
             end
             array = unique
@@ -294,6 +343,21 @@ function table.orderkeys(tab)
     local keys = table.keys(tab)
     table.sort(keys)
     return keys
+end
+
+-- order key/value iterator
+--
+-- for k, v in table.orderpairs(t) do
+--   TODO
+-- end
+function table.orderpairs(t)
+    local orderkeys = table.orderkeys(t)
+    local i = 1
+    return function (t, k)
+        k = orderkeys[i]
+        i = i + 1
+        return k, t[k]
+    end, t, nil
 end
 
 -- get values of a table

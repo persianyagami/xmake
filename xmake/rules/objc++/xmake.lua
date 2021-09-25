@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -23,12 +23,11 @@ rule("objc.build")
     set_sourcekinds("mm")
     add_deps("c.build.pcheader")
     after_load(function (target)
-        if target:values("objc.build.arc") ~= false then
-            target:add("mflags", "-fobjc-arc")
-        else
+        -- deprecated, we need only use `add_mflags("-fno-objc-arc")` to override it
+        if target:values("objc.build.arc") == false then
             target:add("mflags", "-fno-objc-arc")
         end
-        if is_plat("macosx", "iphoneos", "watchos") then
+        if target:is_plat("macosx", "iphoneos", "watchos") then
             target:add("frameworks", "Foundation", "CoreFoundation")
         end
     end)
@@ -39,12 +38,11 @@ rule("objc++.build")
     set_sourcekinds("mxx")
     add_deps("c++.build.pcheader")
     after_load(function (target)
-        if target:values("objc++.build.arc") ~= false then
-            target:add("mxxflags", "-fobjc-arc")
-        else
+        -- deprecated, we need only use `add_mxxflags("-fno-objc-arc")` to override it
+        if target:values("objc++.build.arc") == false then
             target:add("mxxflags", "-fno-objc-arc")
         end
-        if is_plat("macosx", "iphoneos", "watchos") then
+        if target:is_plat("macosx", "iphoneos", "watchos") then
             target:add("frameworks", "Foundation", "CoreFoundation")
         end
     end)

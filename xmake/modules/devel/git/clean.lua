@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        clean.lua
@@ -56,17 +56,11 @@ function main(opt)
         table.insert(argv, "-f")
     end
 
-    -- enter repository directory
-    local oldir = nil
-    if opt.repodir then
-        oldir = os.cd(opt.repodir)
+    -- remove all files and does not use the standard ignore rules
+    if opt.all then
+        table.insert(argv, "-x")
     end
 
     -- clean it
-    os.vrunv(git.program, argv)
-
-    -- leave repository directory
-    if oldir then
-        os.cd(oldir)
-    end
+    os.vrunv(git.program, argv, {curdir = opt.repodir})
 end

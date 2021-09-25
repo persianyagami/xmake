@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        check_cxxsnippets.lua
@@ -23,13 +23,17 @@
 -- e.g.
 --
 -- check_cxxsnippets("HAS_STATIC_ASSERT", "static_assert(1, \"\");")
+-- check_csnippets("HAS_LONG_8", "return (sizeof(long) == 8)? 0 : -1;", {tryrun = true})
+-- check_csnippets("PTR_SIZE", 'printf("%d", sizeof(void*)); return 0;', {output = true, number = true})
 --
 function check_cxxsnippets(definition, snippets, opt)
     opt = opt or {}
     local optname = "__" .. (opt.name or definition)
     option(optname)
-        add_cxxsnippets(definition, snippets)
-        add_defines(definition)
+        add_cxxsnippets(definition, snippets, {tryrun = opt.tryrun, output = opt.output})
+        if not opt.output then
+            add_defines(definition)
+        end
         if opt.links then
             add_links(opt.links)
         end
@@ -50,6 +54,19 @@ function check_cxxsnippets(definition, snippets, opt)
         end
         if opt.warnings then
             set_warnings(opt.warnings)
+        end
+        if opt.output then
+            after_check(function (option)
+                if option:value() then
+                    if opt.number then
+                        option:add("defines", definition .. "=" .. tonumber(option:value()))
+                    elseif opt.quote == false then
+                        option:add("defines", definition .. "=" .. option:value())
+                    else
+                        option:add("defines", definition .. "=\"" .. option:value() .. "\"")
+                    end
+                end
+            end)
         end
     option_end()
     add_options(optname)
@@ -60,14 +77,20 @@ end
 -- e.g.
 --
 -- configvar_check_cxxsnippets("HAS_STATIC_ASSERT", "static_assert(1, \"\");")
+-- configvar_check_cxxsnippets("HAS_LONG_8", "return (sizeof(long) == 8)? 0 : -1;", {tryrun = true})
+-- configvar_check_cxxsnippets("HAS_LONG_8", "return (sizeof(long) == 8)? 0 : -1;", {tryrun = true, default = 0})
+-- configvar_check_cxxsnippets("LONG_SIZE=8", "return (sizeof(long) == 8)? 0 : -1;", {tryrun = true, quote = false})
+-- configvar_check_cxxsnippets("PTR_SIZE", 'printf("%d", sizeof(void*)); return 0;', {output = true, number = true})
 --
 function configvar_check_cxxsnippets(definition, snippets, opt)
     opt = opt or {}
     local optname = "__" .. (opt.name or definition)
     local defname, defval = unpack(definition:split('='))
     option(optname)
-        add_cxxsnippets(definition, snippets)
-        set_configvar(defname, defval or 1)
+        add_cxxsnippets(definition, snippets, {tryrun = opt.tryrun, output = opt.output})
+        if opt.default == nil then
+            set_configvar(defname, defval or 1, {quote = opt.quote})
+        end
         if opt.links then
             add_links(opt.links)
         end
@@ -89,6 +112,17 @@ function configvar_check_cxxsnippets(definition, snippets, opt)
         if opt.warnings then
             set_warnings(opt.warnings)
         end
+        if opt.output then
+            after_check(function (option)
+                if option:value() then
+                    option:set("configvar", defname, opt.number and tonumber(option:value()) or option:value(), {quote = opt.quote})
+                end
+            end)
+        end
     option_end()
-    add_options(optname)
+    if opt.default == nil then
+        add_options(optname)
+    else
+        set_configvar(defname, has_config(optname) and (defval or 1) or opt.default, {quote = opt.quote})
+    end
 end

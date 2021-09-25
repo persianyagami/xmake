@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -47,8 +47,9 @@ task("build")
                 ,   {nil, "dry-run",    "k",  nil   , "Dry run to build target."                                      }
 
                 ,   {}
-                ,   {'j', "jobs",       "kv", tostring(math.ceil(os.cpuinfo().ncpu * 3 / 2)),
-                                                      "Specifies the number of jobs to build simultaneously."         }
+                ,   {'j', "jobs",       "kv", tostring(os.default_njob()),
+                                                      "Set the number of parallel compilation jobs."                  }
+                ,   {nil, "linkjobs",   "kv", nil,    "Set the number of parallel link jobs."                         }
                 ,   {'w', "warning",    "k",  false , "Enable the warnings output."                                   }
                 ,   {nil, "files",      "kv", nil   , "Build the given source files.",
                                                       "e.g. ",

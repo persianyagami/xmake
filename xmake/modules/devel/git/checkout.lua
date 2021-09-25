@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        checkout.lua
@@ -47,17 +47,6 @@ function main(commit, opt)
     -- init argv
     local argv = {"checkout", commit}
 
-    -- enter repository directory
-    local oldir = nil
-    if opt.repodir then
-        oldir = os.cd(opt.repodir)
-    end
-
     -- checkout it
-    os.vrunv(git.program, argv)
-
-    -- leave repository directory
-    if oldir then
-        os.cd(oldir)
-    end
+    os.vrunv(git.program, argv, {curdir = opt.repodir})
 end

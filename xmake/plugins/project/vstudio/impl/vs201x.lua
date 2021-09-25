@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        vs201x.lua
@@ -25,10 +25,27 @@ import("core.project.project")
 import("core.platform.platform")
 import("core.tool.compiler")
 import("core.tool.linker")
+import("core.tool.toolchain")
 import("vs201x_solution")
 import("vs201x_vcxproj")
 import("vs201x_vcxproj_filters")
+import("core.cache.memcache")
+import("core.cache.localcache")
+import("private.action.require.install", {alias = "install_requires"})
+import("actions.config.configfiles", {alias = "generate_configfiles", rootdir = os.programdir()})
 import("actions.config.configheader", {alias = "generate_configheader", rootdir = os.programdir()})
+
+-- clear cache configuration
+function _clear_cacheconf()
+    config.clear()
+    config.save()
+    localcache.clear("config")
+    localcache.clear("detect")
+    localcache.clear("option")
+    localcache.clear("package")
+    localcache.clear("toolchain")
+    localcache.save()
+end
 
 -- make target info
 function _make_targetinfo(mode, arch, target)
@@ -37,9 +54,12 @@ function _make_targetinfo(mode, arch, target)
     local targetinfo = { mode = mode, arch = (arch == "x86" and "Win32" or "x64") }
 
     -- get sdk version
-    local vcvarsall = config.get("__vcvarsall")
-    if vcvarsall then
-        targetinfo.sdkver = (vcvarsall[arch] or {}).WindowsSDKVersion
+    local msvc = toolchain.load("msvc")
+    if msvc then
+        local vcvars = msvc:config("vcvars")
+        if vcvars then
+            targetinfo.sdkver = vcvars.WindowsSDKVersion
+        end
     end
 
     -- save c/c++ precompiled output file (.pch)
@@ -52,7 +72,7 @@ function _make_targetinfo(mode, arch, target)
     targetinfo.symbols = target:get("symbols")
 
     -- save target kind
-    targetinfo.targetkind = target:targetkind()
+    targetinfo.targetkind = target:kind()
 
     -- save target file
     targetinfo.targetfile = target:targetfile()
@@ -88,7 +108,7 @@ function _make_targetinfo(mode, arch, target)
     end
 
     -- save linker flags
-    local linkflags = linker.linkflags(target:targetkind(), target:sourcekinds(), {target = target})
+    local linkflags = linker.linkflags(target:kind(), target:sourcekinds(), {target = target})
     targetinfo.linkflags = linkflags
 
     -- use mfc? save the mfc runtime kind
@@ -114,7 +134,7 @@ end
 function _make_targetheaders(mode, arch, target, last)
 
     -- only for static and shared target
-    local kind = target:targetkind()
+    local kind = target:kind()
     if kind == "static" or kind == "shared" then
 
         -- TODO make headers, (deprecated)
@@ -191,12 +211,46 @@ function _make_vsinfo_archs()
             table.insert(vsinfo_archs, arch:trim())
         end
     else
-        vsinfo_archs = platform.archs()
+        -- we use it first if global set_arch("xx") is setted in xmake.lua
+        vsinfo_archs = project.get("target.arch")
+        if not vsinfo_archs then
+            -- for set_allowedarchs()
+            local allowed_archs = project.allowed_archs(config.plat())
+            if allowed_archs then
+                vsinfo_archs = allowed_archs:to_array()
+            end
+        end
+        if not vsinfo_archs then
+            vsinfo_archs = platform.archs()
+        end
     end
     if not vsinfo_archs or #vsinfo_archs == 0 then
         vsinfo_archs = { config.arch() }
     end
     return vsinfo_archs
+end
+
+-- config target
+function _config_target(target)
+    for _, rule in ipairs(target:orderules()) do
+        local on_config = rule:script("config")
+        if on_config then
+            on_config(target)
+        end
+    end
+    local on_config = target:script("config")
+    if on_config then
+        on_config(target)
+    end
+end
+
+-- config targets
+function _config_targets()
+    for _, target in ipairs(project.ordertargets()) do
+        if target:is_enabled() then
+            _config_target(target)
+        end
+    end
 end
 
 -- make vstudio project
@@ -230,19 +284,33 @@ function make(outputdir, vsinfo)
                 config.set("mode", mode, {readonly = true, force = true})
                 config.set("arch", arch, {readonly = true, force = true})
 
-                -- clear project to reload and recheck it
-                project.clear()
+                -- clear all options
+                for _, opt in ipairs(project.options()) do
+                    opt:clear()
+                end
 
-                -- check configure
-                config.check()
+                -- clear cache
+                memcache.clear()
+                localcache.clear("config")
+                localcache.clear("detect")
+                localcache.clear("option")
+                localcache.clear("package")
+                localcache.clear("toolchain")
+
+                -- check platform
+                platform.load(config.plat(), arch):check()
 
                 -- check project options
                 project.check()
 
-                -- reload platform
-                platform.load(config.plat())
+                -- install and update requires
+                install_requires()
 
-                -- re-generate configheader
+                -- config targets
+                _config_targets()
+
+                -- update config files
+                generate_configfiles()
                 generate_configheader()
             end
 
@@ -251,7 +319,7 @@ function make(outputdir, vsinfo)
 
             -- save targets
             for targetname, target in pairs(project.targets()) do
-                if not target:isphony() then
+                if not target:is_phony() then
 
                     -- make target with the given mode and arch
                     targets[targetname] = targets[targetname] or {}
@@ -263,7 +331,7 @@ function make(outputdir, vsinfo)
 
                     -- init target info
                     _target.name = targetname
-                    _target.kind = target:targetkind()
+                    _target.kind = target:kind()
                     _target.scriptdir = target:scriptdir()
                     _target.info = _target.info or {}
                     table.insert(_target.info, _make_targetinfo(mode, arch, target))
@@ -287,6 +355,9 @@ function make(outputdir, vsinfo)
         vs201x_vcxproj.make(vsinfo, target)
         vs201x_vcxproj_filters.make(vsinfo, target)
     end
+
+    -- clear config and local cache
+    _clear_cacheconf()
 
     -- leave project directory
     os.cd(oldir)

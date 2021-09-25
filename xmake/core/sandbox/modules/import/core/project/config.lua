@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        config.lua
@@ -87,43 +87,26 @@ function sandbox_core_project_config.readonly(name)
 end
 
 -- load the configuration
-function sandbox_core_project_config.load(targetname)
-    return config.load(targetname)
+function sandbox_core_project_config.load(filepath)
+    return config.load(filepath)
 end
 
 -- save the configuration
-function sandbox_core_project_config.save(targetname)
-
-    -- save it
-    local ok, errors = config.save(targetname)
+function sandbox_core_project_config.save(filepath, opt)
+    local ok, errors = config.save(filepath, opt)
     if not ok then
         raise(errors)
     end
 end
 
 -- read the value from the configuration file directly
-function sandbox_core_project_config.read(name, targetname)
-    return config.read(name, targetname)
+function sandbox_core_project_config.read(name)
+    return config.read(name)
 end
 
 -- clear the configuration
 function sandbox_core_project_config.clear()
     config.clear()
-end
-
--- check the configuration
-function sandbox_core_project_config.check()
-
-    -- check configuration for the current platform
-    local instance, errors = platform.load()
-    if instance then
-        local ok, errors = instance:check()
-        if not ok then
-            raise(errors)
-        end
-    else
-        raise(errors)
-    end
 end
 
 -- dump the configuration

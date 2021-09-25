@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -25,7 +25,7 @@ rule("xcode.bundle")
     add_deps("xcode.info_plist")
 
     -- we must set kind before target.on_load(), may we will use target in on_load()
-    before_load(function (target)
+    on_load(function (target)
 
         -- get bundle directory
         local targetdir = target:targetdir()
@@ -35,7 +35,7 @@ rule("xcode.bundle")
         -- get contents and resources directory
         local contentsdir = bundledir
         local resourcesdir = bundledir
-        if is_plat("macosx") then
+        if target:is_plat("macosx") then
             contentsdir = path.join(bundledir, "Contents")
             resourcesdir = path.join(bundledir, "Contents", "Resources")
         end
@@ -74,7 +74,7 @@ rule("xcode.bundle")
             progress.show(opt.progress, "${color.build.target}generating.xcode.$(mode) %s", path.filename(bundledir))
 
             -- copy target file
-            if is_plat("macosx") then
+            if target:is_plat("macosx") then
                 os.vcp(target:targetfile(), path.join(contentsdir, "MacOS", path.filename(target:targetfile())))
             else
                 os.vcp(target:targetfile(), path.join(contentsdir, path.filename(target:targetfile())))

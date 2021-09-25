@@ -12,14 +12,13 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        meson.lua
 --
 
 -- imports
-import("core.base.cli")
 import("core.base.option")
 import("core.project.config")
 import("lib.detect.find_file")
@@ -47,7 +46,7 @@ function _get_configs(artifacts_dir, buildir)
     -- add extra user configs
     local tryconfigs = config.get("tryconfigs")
     if tryconfigs then
-        for _, opt in ipairs(cli.parse(tryconfigs)) do
+        for _, opt in ipairs(os.argv(tryconfigs)) do
             table.insert(configs, tostring(opt))
         end
     end

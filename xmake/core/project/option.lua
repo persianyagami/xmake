@@ -12,15 +12,15 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        option.lua
 --
 
 -- define module
-local option = option or {}
-local _instance = _instance or {}
+local option    = {}
+local _instance = {}
 
 -- load modules
 local io             = require("base/io")
@@ -33,12 +33,13 @@ local global         = require("base/global")
 local scopeinfo      = require("base/scopeinfo")
 local interpreter    = require("base/interpreter")
 local config         = require("project/config")
-local cache          = require("project/cache")
+local localcache     = require("cache/localcache")
 local linker         = require("tool/linker")
 local compiler       = require("tool/compiler")
 local sandbox        = require("sandbox/sandbox")
 local language       = require("language/language")
 local sandbox        = require("sandbox/sandbox")
+local sandbox_os     = require("sandbox/modules/os")
 local sandbox_module = require("sandbox/modules/import/core/sandbox/module")
 
 -- new an instance
@@ -67,22 +68,23 @@ function _instance:_clear()
     option._cache():set(self:name(), nil)
 end
 
--- check option conditions
-function _instance:_do_check()
+-- check snippets
+function _instance:_do_check_cxsnippets(snippets)
 
     -- import check_cxsnippets()
     self._check_cxsnippets = self._check_cxsnippets or sandbox_module.import("lib.detect.check_cxsnippets", {anonymous = true})
 
     -- check for c and c++
-    local passed = nil
+    local passed = 0
+    local result_output
     for _, kind in ipairs({"c", "cxx"}) do
 
         -- get conditions
-        local links    = self:get("links")
-        local snippets = self:get(kind .. "snippets")
-        local types    = self:get(kind .. "types")
-        local funcs    = self:get(kind .. "funcs")
-        local includes = self:get(kind .. "includes")
+        local links              = self:get("links")
+        local snippets           = self:get(kind .. "snippets")
+        local types              = self:get(kind .. "types")
+        local funcs              = self:get(kind .. "funcs")
+        local includes           = self:get(kind .. "includes")
 
         -- TODO it is deprecated
         local snippet  = self:get(kind .. "snippet")
@@ -99,23 +101,98 @@ function _instance:_do_check()
                 sourcekind = "cc"
             end
 
-            -- check it
-            local ok, results_or_errors = sandbox.load(self._check_cxsnippets, snippets, {target = self, sourcekind = sourcekind, types = types, funcs = funcs, includes = includes})
-            if not ok then
-                return false, results_or_errors
+            -- split snippets
+            local snippets_build = {}
+            local snippets_tryrun = {}
+            local snippets_output = {}
+            if snippets then
+                for name, snippet in pairs(snippets) do
+                    if self:extraconf(kind .. "snippets", name, "output") then
+                        snippets_output[name] = snippet
+                    elseif self:extraconf(kind .. "snippets", name, "tryrun") then
+                        snippets_tryrun[name] = snippet
+                    else
+                        snippets_build[name] = snippet
+                    end
+                end
+                if #table.keys(snippets_output) > 1 then
+                    return false, -1, string.format("option(%s): only support for only one snippet with output!", self:name())
+                end
             end
 
-            -- passed?
-            if results_or_errors then
-                passed = true
-            else
-                passed = false
-                break
+            -- check snippets (run with output)
+            if #table.keys(snippets_output) > 0 then
+                local ok, results_or_errors, output = sandbox.load(self._check_cxsnippets, snippets_output, {
+                                                            target = self,
+                                                            sourcekind = sourcekind,
+                                                            types = types,
+                                                            funcs = funcs,
+                                                            includes = includes,
+                                                            tryrun = true, output = true})
+                if not ok then
+                    return false, -1, results_or_errors
+                end
+
+                -- passed or no passed?
+                if results_or_errors then
+                    passed = 1
+                    result_output = output
+                else
+                    passed = -1
+                    break
+                end
+            end
+
+            -- check snippets (run only)
+            if passed == 0 and #table.keys(snippets_tryrun) > 0 then
+                local ok, results_or_errors = sandbox.load(self._check_cxsnippets, snippets_tryrun, {
+                                                            target = self,
+                                                            sourcekind = sourcekind,
+                                                            types = types,
+                                                            funcs = funcs,
+                                                            includes = includes,
+                                                            tryrun = true})
+                if not ok then
+                    return false, -1, results_or_errors
+                end
+
+                -- passed or no passed?
+                if results_or_errors then
+                    passed = 1
+                else
+                    passed = -1
+                    break
+                end
+            end
+
+            -- check snippets (build only)
+            if passed == 0 or #table.keys(snippets_build) > 0 then
+                local ok, results_or_errors = sandbox.load(self._check_cxsnippets, snippets_build, {
+                                                            target = self,
+                                                            sourcekind = sourcekind,
+                                                            types = types,
+                                                            funcs = funcs,
+                                                            includes = includes})
+                if not ok then
+                    return false, -1, results_or_errors
+                end
+
+                -- passed or no passed?
+                if results_or_errors then
+                    passed = 1
+                else
+                    passed = -1
+                    break
+                end
             end
         end
     end
+    return true, passed, result_output
+end
 
-    -- check features
+-- check features
+function _instance:_do_check_features()
+    local passed = 0
     local features = self:get("features")
     if features then
 
@@ -126,23 +203,49 @@ function _instance:_do_check()
         features = table.wrap(features)
         local features_supported = self._core_tool_compiler.has_features(features, {target = self})
         if features_supported and #features_supported == #features then
-            passed = true
+            passed = 1
         end
 
         -- trace
         if baseoption.get("verbose") or baseoption.get("diagnosis") then
             for _, feature in ipairs(features) do
-                utils.cprint("${dim}checking for feature(%s) ... %s", feature, passed and "${color.success}${text.success}" or "${color.nothing}${text.nothing}")
+                utils.cprint("${dim}checking for feature(%s) ... %s", feature, passed > 0 and "${color.success}${text.success}" or "${color.nothing}${text.nothing}")
             end
+        end
+    end
+    return true, passed
+end
+
+-- check option conditions
+function _instance:_do_check()
+
+    -- check snippets
+    local ok, passed, errors = self:_do_check_cxsnippets()
+    if not ok then
+        return false, errors
+    end
+
+    -- get snippet output
+    local output
+    if passed then
+        output = errors
+    end
+
+    -- check features
+    if passed == 0 then
+        ok, passed, errors = self:_do_check_features()
+        if not ok then
+            return false, errors
         end
     end
 
     -- enable this option if be passed
-    if passed then
+    if passed > 0 then
         self:enable(true)
+        if output then
+            self:set_value(output)
+        end
     end
-
-    -- ok
     return true
 end
 
@@ -174,7 +277,14 @@ function _instance:_check()
     end
 
     -- trace
-    utils.cprint("checking for %s ... %s", name, self:enabled() and "${color.success}${text.success}" or "${color.nothing}${text.nothing}")
+    local result
+    if self:enabled() then
+        local value = self:value()
+        result = "${color.success}" .. (type(value) == "boolean" and "${text.success}" or tostring(value))
+    else
+        result = "${color.nothing}${text.nothing}"
+    end
+    utils.cprint("checking for %s ... %s", name, result)
     if not ok then
         os.raise(errors)
     end
@@ -239,21 +349,13 @@ end
 
 -- set the option value
 function _instance:set_value(value)
-
-    -- set value to option
     config.set(self:name(), value)
-
-    -- save option
     self:_save()
 end
 
 -- clear the option status and need recheck it
 function _instance:clear()
-
-    -- clear config
     config.set(self:name(), nil)
-
-    -- clear this option in cache
     self:_clear()
 end
 
@@ -373,17 +475,7 @@ end
 
 -- get cache
 function option._cache()
-
-    -- get it from cache first if exists
-    if option._CACHE then
-        return option._CACHE
-    end
-
-    -- init cache
-    option._CACHE = cache("local.option")
-
-    -- ok
-    return option._CACHE
+    return localcache.cache("option")
 end
 
 -- get option apis
@@ -453,7 +545,7 @@ function option.interpreter()
         ,   mode       = function() return config.get("mode") or "release" end
         ,   host       = os.host()
         ,   subhost    = os.subhost()
-        ,   prefix     = "$(prefix)"
+        ,   scriptdir  = function () return interp:pending() and interp:scriptdir() or sandbox_os.scriptdir() end
         ,   globaldir  = global.directory()
         ,   configdir  = config.directory()
         ,   projectdir = os.projectdir()
@@ -496,7 +588,7 @@ end
 
 -- save all options to the cache file
 function option.save()
-    option._cache():flush()
+    option._cache():save()
 end
 
 -- return module

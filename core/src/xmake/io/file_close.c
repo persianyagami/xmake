@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      OpportunityLiu, ruki
  * @file        file_close.c
@@ -64,6 +64,12 @@ tb_int_t xm_io_file_close(lua_State* lua)
             tb_buffer_clear(&file->wcache);
         }
 #endif
+
+        // flush filter stream cache, TODO we should fix it in tbox/stream
+        if ((file->mode & TB_FILE_MODE_RW) == TB_FILE_MODE_RW && file->fstream)
+        {
+            if (!tb_stream_sync(file->file_ref, tb_false)) return tb_false;
+        }
 
         // close file
         tb_stream_clos(file->file_ref);

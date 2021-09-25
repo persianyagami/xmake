@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -25,7 +25,7 @@ rule("xcode.framework")
     add_deps("xcode.info_plist")
 
     -- we must set kind before target.on_load(), may we will use target in on_load()
-    before_load(function (target)
+    on_load(function (target)
 
         -- get framework directory
         local targetdir = target:targetdir()
@@ -147,7 +147,7 @@ rule("xcode.framework")
             os.cd(oldir)
 
             -- do codesign, only for dynamic library
-            if target:targetkind() == "shared" then
+            if target:kind() == "shared" then
                 local codesign_identity = target:values("xcode.codesign_identity") or get_config("xcode_codesign_identity")
                 if target:is_plat("macosx") or (target:is_plat("iphoneos") and target:is_arch("x86_64", "i386")) then
                     codesign_identity = nil

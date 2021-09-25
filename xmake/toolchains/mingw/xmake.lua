@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -48,7 +48,7 @@ toolchain("mingw")
         elseif toolchain:is_arch("armv7", "arm.*") then
             cross = "armv7-w64-mingw32-"
         else
-            cross = config.get("cross") or ""
+            cross = toolchain:cross() or ""
         end
 
         -- add bin search library for loading some dependent .dll files windows

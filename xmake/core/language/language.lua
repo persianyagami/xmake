@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        language.lua
@@ -123,7 +123,7 @@ end
 -- e.g.
 -- {binary = "ld", static = "ar", shared = "sh"}
 --
-function _instance:targetkinds()
+function _instance:kinds()
     return self._INFO:get("targetkinds")
 end
 
@@ -247,11 +247,7 @@ function language._interpreter()
         ,   "language.set_targetflags"
         }
     }
-
-    -- save interpreter
     language._INTERPRETER = interp
-
-    -- ok?
     return interp
 end
 
@@ -260,10 +256,12 @@ function language.load(name)
 
     -- load all languages
     if not name then
-        for _, name in ipairs(table.wrap(os.match(path.join(language._directory(), "*"), true))) do
-            local instance, errors = language.load(path.basename(name))
-            if not instance then
-                return nil, errors
+        if not language._LANGUAGES then
+            for _, name in ipairs(table.wrap(os.match(path.join(language._directory(), "*"), true))) do
+                local instance, errors = language.load(path.basename(name))
+                if not instance then
+                    return nil, errors
+                end
             end
         end
         return language._LANGUAGES
@@ -311,11 +309,7 @@ function language.load(name)
     if not instance then
         return nil, errors
     end
-
-    -- save instance to the cache
     language._LANGUAGES[name] = instance
-
-    -- ok
     return instance
 end
 
@@ -345,16 +339,10 @@ function language.load_sk(sourcekind)
             break
         end
     end
-
-    -- not found?
     if not result then
         return nil, string.format("unknown language sourcekind: %s", sourcekind)
     end
-
-    -- cache this language
     language._LANGUAGES_OF_SK[sourcekind] = result
-
-    -- ok
     return result
 end
 
@@ -384,45 +372,37 @@ function language.load_ex(extension)
             break
         end
     end
-
-    -- not found?
     if not result then
         return nil, string.format("unknown language source extension: %s", extension)
     end
-
-    -- cache this language
     language._LANGUAGES_OF_EX[extension] = result
-
-    -- ok
     return result
 end
 
 
 -- load the language apis
 function language.apis()
-
-    -- load all languages
-    local languages, errors = language.load()
-    if not languages then
-        os.raise(errors)
-    end
-
-    -- merge apis for each language
-    local apis = {values = {}, paths = {}, custom = {}, dictionary = {}}
-    for name, instance in pairs(languages) do
-        local instance_apis = instance:get("apis")
-        if instance_apis then
-            table.join2(apis.values,     table.wrap(instance_apis.values))
-            table.join2(apis.paths,      table.wrap(instance_apis.paths))
-            table.join2(apis.custom,     table.wrap(instance_apis.custom))
-            table.join2(apis.dictionary, table.wrap(instance_apis.dictionary))
+    local apis = language._APIS
+    if not apis then
+        local languages, errors = language.load()
+        if not languages then
+            os.raise(errors)
         end
+        apis = {values = {}, paths = {}, custom = {}, dictionary = {}}
+        for name, instance in pairs(languages) do
+            local instance_apis = instance:get("apis")
+            if instance_apis then
+                table.join2(apis.values,     table.wrap(instance_apis.values))
+                table.join2(apis.paths,      table.wrap(instance_apis.paths))
+                table.join2(apis.custom,     table.wrap(instance_apis.custom))
+                table.join2(apis.dictionary, table.wrap(instance_apis.dictionary))
+            end
+        end
+        apis.values = table.unique(apis.values)
+        apis.paths  = table.unique(apis.paths)
+        apis.custom = table.unique(apis.custom)
+        language._APIS = apis
     end
-    apis.values = table.unique(apis.values)
-    apis.paths  = table.unique(apis.paths)
-    apis.custom = table.unique(apis.custom)
-
-    -- ok
     return apis
 end
 
@@ -441,28 +421,18 @@ end
 -- }
 --
 function language.extensions()
-
-    -- attempt to get it from cache
-    if language._EXTENSIONS then
-        return language._EXTENSIONS
+    local extensions = language._EXTENSIONS
+    if not extensions then
+        local languages, errors = language.load()
+        if not languages then
+            os.raise(errors)
+        end
+        extensions = {}
+        for name, instance in pairs(languages) do
+            table.join2(extensions, instance:extensions())
+        end
+        language._EXTENSIONS = extensions
     end
-
-    -- load all languages
-    local languages, errors = language.load()
-    if not languages then
-        os.raise(errors)
-    end
-
-    -- merge all for each language
-    local extensions = {}
-    for name, instance in pairs(languages) do
-        table.join2(extensions, instance:extensions())
-    end
-
-    -- cache it
-    language._EXTENSIONS = extensions
-
-    -- ok
     return extensions
 end
 
@@ -480,28 +450,18 @@ end
 -- }
 --
 function language.sourcekinds()
-
-    -- attempt to get it from cache
-    if language._SOURCEKINDS then
-        return language._SOURCEKINDS
+    local sourcekinds = language._SOURCEKINDS
+    if not sourcekinds then
+        local languages, errors = language.load()
+        if not languages then
+            os.raise(errors)
+        end
+        sourcekinds = {}
+        for name, instance in pairs(languages) do
+            table.join2(sourcekinds, instance:sourcekinds())
+        end
+        language._SOURCEKINDS = sourcekinds
     end
-
-    -- load all languages
-    local languages, errors = language.load()
-    if not languages then
-        os.raise(errors)
-    end
-
-    -- merge all for each language
-    local sourcekinds = {}
-    for name, instance in pairs(languages) do
-        table.join2(sourcekinds, instance:sourcekinds())
-    end
-
-    -- cache it
-    language._SOURCEKINDS = sourcekinds
-
-    -- ok
     return sourcekinds
 end
 
@@ -516,28 +476,18 @@ end
 -- }
 --
 function language.sourceflags()
-
-    -- attempt to get it from cache
-    if language._SOURCEFLAGS then
-        return language._SOURCEFLAGS
+    local sourceflags = language._SOURCEFLAGS
+    if not sourceflags then
+        local languages, errors = language.load()
+        if not languages then
+            os.raise(errors)
+        end
+        sourceflags = {}
+        for name, instance in pairs(languages) do
+            table.join2(sourceflags, instance:sourceflags())
+        end
+        language._SOURCEFLAGS = sourceflags
     end
-
-    -- load all languages
-    local languages, errors = language.load()
-    if not languages then
-        os.raise(errors)
-    end
-
-    -- merge all for each language
-    local sourceflags = {}
-    for name, instance in pairs(languages) do
-        table.join2(sourceflags, instance:sourceflags())
-    end
-
-    -- cache it
-    language._SOURCEFLAGS = sourceflags
-
-    -- ok
     return sourceflags
 end
 
@@ -558,21 +508,15 @@ function language.sourcekind_of(sourcefile)
     if not sourcekind then
         return nil, string.format("%s is unknown extension", extension)
     end
-
-    -- ok
     return sourcekind
 end
 
 -- get extension of the source kind
 function language.extension_of(sourcekind)
-
-    -- get extension
     local extension = table.wrap(language.sourcekinds()[sourcekind])[1]
     if not extension then
         return nil, string.format("%s is unknown source kind", sourcekind)
     end
-
-    -- ok
     return extension
 end
 
@@ -594,7 +538,7 @@ function language.linkerinfos_of(targetkind, sourcekinds)
         for name, instance in pairs(languages) do
             for _, mixingkind in ipairs(table.wrap(instance:mixingkinds())) do
                 local targetflags = instance:targetflags()
-                for _targetkind, linkerkind in pairs(table.wrap(instance:targetkinds())) do
+                for _targetkind, linkerkind in pairs(table.wrap(instance:kinds())) do
 
                     -- init linker info
                     linkerinfos[_targetkind] = linkerinfos[_targetkind] or {}
@@ -613,8 +557,6 @@ function language.linkerinfos_of(targetkind, sourcekinds)
                 end
             end
         end
-
-        -- cache it
         language._LINKERINFOS = linkerinfos
     end
 
@@ -652,34 +594,24 @@ end
 -- }
 --
 function language.targetkinds()
-
-    -- attempt to get it from cache
-    if language._TARGETKINDS then
-        return language._TARGETKINDS
-    end
-
-    -- load all languages
-    local languages, errors = language.load()
-    if not languages then
-        os.raise(errors)
-    end
-
-    -- merge all for each language
-    local targetkinds = {}
-    for name, instance in pairs(languages) do
-        for targetkind, linkerkind in pairs(table.wrap(instance:targetkinds())) do
-            targetkinds[targetkind] = targetkinds[targetkind] or {}
-            table.insert(targetkinds[targetkind], linkerkind)
+    local targetkinds = language._TARGETKINDS
+    if not targetkinds then
+        local languages, errors = language.load()
+        if not languages then
+            os.raise(errors)
         end
+        targetkinds = {}
+        for name, instance in pairs(languages) do
+            for targetkind, linkerkind in pairs(table.wrap(instance:kinds())) do
+                targetkinds[targetkind] = targetkinds[targetkind] or {}
+                table.insert(targetkinds[targetkind], linkerkind)
+            end
+        end
+        for targetkind, linkerkinds in pairs(targetkinds) do
+            targetkinds[targetkind] = table.unique(linkerkinds)
+        end
+        language._TARGETKINDS = targetkinds
     end
-    for targetkind, linkerkinds in pairs(targetkinds) do
-        targetkinds[targetkind] = table.unique(linkerkinds)
-    end
-
-    -- cache it
-    language._TARGETKINDS = targetkinds
-
-    -- ok
     return targetkinds
 end
 
@@ -700,30 +632,19 @@ end
 -- }
 --
 function language.langkinds()
-
-    -- attempt to get it from cache
-    if language._LANGKINDS then
-        return language._LANGKINDS
+    local langkinds = language._LANGKINDS
+    if not langkinds then
+        local languages, errors = language.load()
+        if not languages then
+            os.raise(errors)
+        end
+        langkinds = {}
+        for name, instance in pairs(languages) do
+            table.join2(langkinds, instance:langkinds())
+        end
+        language._LANGKINDS = langkinds
     end
-
-    -- load all languages
-    local languages, errors = language.load()
-    if not languages then
-        os.raise(errors)
-    end
-
-    -- merge all for each language
-    local langkinds = {}
-    for name, instance in pairs(languages) do
-        table.join2(langkinds, instance:langkinds())
-    end
-
-    -- cache it
-    language._LANGKINDS = langkinds
-
-    -- ok
     return langkinds
 end
 
--- return module
 return language

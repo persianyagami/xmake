@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -46,6 +46,10 @@ toolchain("xcode")
             arch = toolchain:arch()
             simulator = (arch == "i386")
             cross = simulator and "xcrun -sdk watchsimulator " or "xcrun -sdk watchos "
+        elseif toolchain:is_plat("appletvos") then
+            arch = toolchain:arch()
+            simulator = (arch == "i386" or arch == "x86_64")
+            cross = simulator and "xcrun -sdk appletvsimulator " or "xcrun -sdk appletvos "
         else
             raise("unknown platform for xcode!")
         end

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        clang.lua
@@ -123,4 +123,17 @@ function nf_warning(self, level)
     ,   error      = "-Werror"
     }
     return maps[level]
+end
+
+-- make the symbol flag
+function nf_symbol(self, level)
+    local kind = self:kind()
+    if kind == "ld" or kind == "sh" then
+        -- clang/windows need add `-g` to linker to generate pdb symbol file
+        if self:plat() == "windows" and level == "debug" then
+            return "-g"
+        end
+    else
+        return _super.nf_symbol(self, level)
+    end
 end

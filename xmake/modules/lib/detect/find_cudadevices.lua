@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      OpportunityLiu
 -- @file        find_cudadevices.lua
@@ -22,7 +22,7 @@
 import("core.base.option")
 import("core.platform.platform")
 import("core.project.config")
-import("lib.detect.cache")
+import("core.cache.detectcache")
 import("lib.detect.find_tool")
 
 -- a magic string to filter output
@@ -181,7 +181,7 @@ function _get_devices(opt)
     end
 
     -- check cache
-    local cachedata = cache.load(cachekey)
+    local cachedata = detectcache:get(cachekey) or {}
     if cachedata.succeed and not opt.force then
         return cachedata.data
     end
@@ -196,7 +196,8 @@ function _get_devices(opt)
     end
 
     -- fill cache
-    cache.save(cachekey, cachedata)
+    detectcache:set(cachekey, cachedata)
+    detectcache:save()
     return devices
 end
 

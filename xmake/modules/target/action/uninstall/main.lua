@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -36,12 +36,12 @@ function main(target, opt)
     end
 
     -- trace
-    print("uninstalling from %s ..", installdir)
+    print("uninstalling %s from %s ..", target:name(), installdir)
 
     -- call script
-    if not target:isphony() then
+    if not target:is_phony() then
         local install_style = target:is_plat("windows", "mingw") and "windows" or "unix"
-        local script = import(install_style, {anonymous = true})["uninstall_" .. target:targetkind()]
+        local script = import(install_style, {anonymous = true})["uninstall_" .. target:kind()]
         if script then
             script(target, opt)
         end

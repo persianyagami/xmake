@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        socket_sendto.c
@@ -78,7 +78,7 @@ tb_int_t xm_io_socket_sendto(lua_State* lua)
     if (!data || !size)
     {
         lua_pushinteger(lua, -1);
-        lua_pushfstring(lua, "invalid data(%p) and size(%zu)!", data, size);
+        lua_pushfstring(lua, "invalid data(%p) and size(%d)!", data, (tb_int_t)size);
         return 2;
     }
 

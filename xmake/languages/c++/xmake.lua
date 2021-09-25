@@ -12,47 +12,26 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define language
 language("c++")
-
-    -- set source file kinds
+    add_rules("c++")
     set_sourcekinds {cc = ".c", cxx = {".cpp", ".cc", ".cxx"}}
-
-    -- set source file flags
     set_sourceflags {cc = {"cflags", "cxflags"}, cxx = {"cxxflags", "cxflags"}}
-
-    -- set target kinds
     set_targetkinds {binary = "ld", static = "ar", shared = "sh"}
-
-    -- set target flags
     set_targetflags {binary = "ldflags", static = "arflags", shared = "shflags"}
-
-    -- set language kinds
-    set_langkinds {c = "cc", cxx = "cxx"}
-
-    -- set mixing kinds
+    set_langkinds   {c = "cc", cxx = "cxx"}
     set_mixingkinds("cc", "cxx", "as", "mrc")
 
-    -- add rules
-    add_rules("c++")
-
-    -- on load
     on_load("load")
-
-    -- on check_main
     on_check_main("check_main")
 
-    -- set name flags
-    set_nameflags
-    {
-        object =
-        {
+    set_nameflags {
+        object = {
             "config.includedirs"
         ,   "config.frameworkdirs"
         ,   "config.frameworks"
@@ -62,6 +41,7 @@ language("c++")
         ,   "target.optimize:check"
         ,   "target.vectorexts:check"
         ,   "target.languages"
+        ,   "target.runtimes"
         ,   "target.includedirs"
         ,   "target.defines"
         ,   "target.undefines"
@@ -69,30 +49,15 @@ language("c++")
         ,   "target.frameworks"
         ,   "target.pcheader"
         ,   "target.pcxxheader"
-        ,   "option.symbols"
-        ,   "option.warnings"
-        ,   "option.fpmodels"
-        ,   "option.optimize:check"
-        ,   "option.vectorexts:check"
-        ,   "option.languages"
-        ,   "option.includedirs"
-        ,   "option.defines"
-        ,   "option.undefines"
-        ,   "option.defines_if_ok"
-        ,   "option.undefines_if_ok"
-        ,   "option.frameworkdirs"
-        ,   "option.frameworks"
         ,   "toolchain.includedirs"
         ,   "toolchain.defines"
         ,   "toolchain.undefines"
         ,   "toolchain.frameworkdirs"
         ,   "toolchain.frameworks"
         ,   "target.sysincludedirs"
-        ,   "option.sysincludedirs"
         ,   "toolchain.sysincludedirs"
         }
-    ,   binary =
-        {
+    ,   binary = {
             "config.linkdirs"
         ,   "config.frameworkdirs"
         ,   "target.linkdirs"
@@ -100,29 +65,21 @@ language("c++")
         ,   "target.rpathdirs"
         ,   "target.strip"
         ,   "target.symbols"
-        ,   "option.strip"
-        ,   "option.symbols"
-        ,   "option.linkdirs"
-        ,   "option.rpathdirs"
-        ,   "option.frameworkdirs"
+        ,   "target.runtimes"
         ,   "toolchain.linkdirs"
         ,   "toolchain.rpathdirs"
         ,   "toolchain.frameworkdirs"
         ,   "config.links"
         ,   "target.links"
-        ,   "option.links"
         ,   "toolchain.links"
         ,   "config.frameworks"
         ,   "target.frameworks"
-        ,   "option.frameworks"
         ,   "toolchain.frameworks"
         ,   "config.syslinks"
         ,   "target.syslinks"
-        ,   "option.syslinks"
         ,   "toolchain.syslinks"
         }
-    ,   shared =
-        {
+    ,   shared = {
             "config.linkdirs"
         ,   "config.frameworkdirs"
         ,   "target.linkdirs"
@@ -130,35 +87,26 @@ language("c++")
         ,   "target.rpathdirs"
         ,   "target.strip"
         ,   "target.symbols"
-        ,   "option.strip"
-        ,   "option.symbols"
-        ,   "option.linkdirs"
-        ,   "option.rpathdirs"
-        ,   "option.frameworkdirs"
+        ,   "target.runtimes"
         ,   "toolchain.linkdirs"
         ,   "toolchain.rpathdirs"
         ,   "toolchain.frameworkdirs"
         ,   "config.links"
         ,   "target.links"
-        ,   "option.links"
         ,   "toolchain.links"
         ,   "config.frameworks"
         ,   "target.frameworks"
-        ,   "option.frameworks"
         ,   "toolchain.frameworks"
         ,   "config.syslinks"
         ,   "target.syslinks"
-        ,   "option.syslinks"
         ,   "toolchain.syslinks"
         }
-    ,   static =
-        {
+    ,   static = {
             "target.strip"
         ,   "target.symbols"
         }
     }
 
-    -- set menu
     set_menu {
                 config =
                 {

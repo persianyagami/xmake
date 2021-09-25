@@ -21,8 +21,7 @@ function test_vsxmake(t)
     -- set config
     local arch = os.getenv("platform") or "x86"
     config.set("arch", arch, {readonly = true, force = true})
-    config.check()
-    platform.load(config.plat())
+    platform.load(config.plat(), arch):check()
 
     -- create sln & vcxproj
     local vs = config.get("vs")
@@ -42,7 +41,7 @@ function test_vsxmake(t)
         {
             function ()
                 print("--- sln file ---")
-                io.cat(projname .. "_" .. vstype .. ".sln")
+                io.cat(projname .. ".sln")
                 print("--- vcx file ---")
                 io.cat(projname .. "/" .. projname .. ".vcxproj")
                 print("--- filter file ---")

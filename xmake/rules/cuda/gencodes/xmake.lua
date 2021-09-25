@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -34,7 +34,7 @@ rule("cuda.gencodes")
     --                                    if no available device is found, no `-gencode` flags will be added
     --                                    @seealso xmake/modules/lib/detect/find_cudadevices
     --
-    before_load(function (target)
+    on_load(function (target)
 
         -- imports
         import("core.platform.platform")

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      OpportunityLiu
 -- @file        getinfo.lua
@@ -23,13 +23,15 @@ import("core.base.option")
 import("core.base.semver")
 import("core.base.hashset")
 import("core.project.config")
-import("core.project.cache")
 import("core.project.project")
 import("core.platform.platform")
 import("core.tool.compiler")
 import("core.tool.linker")
+import("core.cache.memcache")
+import("core.cache.localcache")
 import("lib.detect.find_tool")
 import("private.action.run.make_runenvs")
+import("private.action.require.install", {alias = "install_requires"})
 import("actions.config.configheader", {alias = "generate_configheader", rootdir = os.programdir()})
 import("actions.config.configfiles", {alias = "generate_configfiles", rootdir = os.programdir()})
 
@@ -132,7 +134,10 @@ function _make_targetinfo(mode, arch, target)
     -- use target:get("xxx") rather than target:xxx()
 
     -- save target kind
-    targetinfo.kind          = target:get("kind")
+    targetinfo.kind          = target:kind()
+
+    -- is default?
+    targetinfo.default       = tostring(target:is_default())
 
     -- save target file
     targetinfo.basename      = _escape(target:get("basename"))
@@ -147,26 +152,42 @@ function _make_targetinfo(mode, arch, target)
     targetinfo.includedirs   = _make_dirs(table.join(_get_values_from_target(target, "includedirs") or {}, _get_values_from_target(target, "sysincludedirs")))
     targetinfo.linkdirs      = _make_dirs(_get_values_from_target(target, "linkdirs"))
     targetinfo.sourcedirs    = _make_dirs(_get_values_from_target(target, "values.project.vsxmake.sourcedirs"))
+    targetinfo.pcheaderfile  = target:pcheaderfile("cxx") or target:pcheaderfile("c")
 
     -- save defines
     targetinfo.defines       = _make_arrs(_get_values_from_target(target, "defines"))
+
+    -- save languages
     targetinfo.languages     = _make_arrs(_get_values_from_target(target, "languages"))
-    targetinfo.cxxlanguage   = "stdcpp14" -- only for intellisense
-    if targetinfo.languages:find("c++17", 1, true) or targetinfo.languages:find("cxx17", 1, true) then
-        targetinfo.cxxlanguage = "stdcpp17"
+    if targetinfo.languages then
+        -- fix c++17 to cxx17 for Xmake.props
+        targetinfo.languages = targetinfo.languages:replace("c++", "cxx", {plain = true})
     end
-    local configcache = cache("local.config")
-    local flags = {}
-    for k, v in pairs(configcache:get("options_" .. target:name())) do
-        if k ~= "plat" and k ~= "mode" and k ~= "arch" and k ~= "clean" and k ~= "buildir" then
-            table.insert(flags, "--" .. k .. "=" .. tostring(v));
+
+    -- save subsystem
+    local linkflags = linker.linkflags(target:kind(), target:sourcekinds(), {target = target})
+    for _, linkflag in ipairs(linkflags) do
+        if linkflag:lower():find("[%-/]subsystem:windows") then
+            targetinfo.subsystem = "windows"
         end
     end
-    targetinfo.configflags   = os.args(flags)
+    if not targetinfo.subsystem then
+        targetinfo.subsystem = "console"
+    end
 
     -- save runenvs
     local runenvs = {}
     local addrunenvs, setrunenvs = make_runenvs(target)
+    for k, v in pairs(target:pkgenvs()) do
+        addrunenvs = addrunenvs or {}
+        addrunenvs[k] = table.join(table.wrap(addrunenvs[k]), path.splitenv(v))
+    end
+    for _, dep in ipairs(target:orderdeps()) do
+        for k, v in pairs(dep:pkgenvs()) do
+            addrunenvs = addrunenvs or {}
+            addrunenvs[k] = table.join(table.wrap(addrunenvs[k]), path.splitenv(v))
+        end
+    end
     for k, v in pairs(addrunenvs) do
         if k:upper() == "PATH" then
             runenvs[k] = format("%s;$([System.Environment]::GetEnvironmentVariable('%s'))", _make_dirs(v), k)
@@ -240,12 +261,71 @@ function _make_vsinfo_archs()
             table.insert(vsinfo_archs, arch:trim())
         end
     else
-        vsinfo_archs = platform.archs()
+        -- we use it first if global set_arch("xx") is setted in xmake.lua
+        vsinfo_archs = project.get("target.arch")
+        if not vsinfo_archs then
+            -- for set_allowedarchs()
+            local allowed_archs = project.allowed_archs(config.plat())
+            if allowed_archs then
+                vsinfo_archs = allowed_archs:to_array()
+            end
+        end
+        if not vsinfo_archs then
+            vsinfo_archs = platform.archs()
+        end
     end
     if not vsinfo_archs or #vsinfo_archs == 0 then
         vsinfo_archs = { config.arch() }
     end
     return vsinfo_archs
+end
+
+function _make_vsinfo_groups()
+    local groups = {}
+    local group_deps = {}
+    for targetname, target in pairs(project.targets()) do
+        if not target:is_phony() then
+            local group_path = target:get("group")
+            if group_path then
+                local group_name = path.filename(group_path)
+                local group_names = path.split(group_path)
+                for idx, name in ipairs(group_names) do
+                    local group = groups["group." .. name] or {}
+                    group.group = name
+                    group.group_id = hash.uuid4(name)
+                    if idx > 1 then
+                        group_deps["group_dep." .. name] = {current_id = group.group_id, parent_id = hash.uuid4(group_names[idx - 1])}
+                    end
+                    groups["group." .. name] = group
+                end
+                group_deps["group_dep.target." .. targetname] = {current_id = hash.uuid4(targetname), parent_id = groups["group." .. group_name].group_id}
+            end
+        end
+    end
+    return groups, group_deps
+end
+
+-- config target
+function _config_target(target)
+    for _, rule in ipairs(target:orderules()) do
+        local on_config = rule:script("config")
+        if on_config then
+            on_config(target)
+        end
+    end
+    local on_config = target:script("config")
+    if on_config then
+        on_config(target)
+    end
+end
+
+-- config targets
+function _config_targets()
+    for _, target in ipairs(project.ordertargets()) do
+        if target:is_enabled() then
+            _config_target(target)
+        end
+    end
 end
 
 -- make vstudio project
@@ -273,16 +353,33 @@ function main(outputdir, vsinfo)
 
     -- init modes
     vsinfo.modes = _make_vsinfo_modes()
+
     -- init archs
     vsinfo.archs = _make_vsinfo_archs()
 
+    -- init groups
+    local groups, group_deps = _make_vsinfo_groups()
+    vsinfo.groups            = table.keys(groups)
+    vsinfo.group_deps        = table.keys(group_deps)
+    vsinfo._groups           = groups
+    vsinfo._group_deps       = group_deps
+
+    -- init config flags
+    local flags = {}
+    for k, v in pairs(localcache.get("config", "options")) do
+        if k ~= "plat" and k ~= "mode" and k ~= "arch" and k ~= "clean" and k ~= "buildir" then
+            table.insert(flags, "--" .. k .. "=" .. tostring(v))
+        end
+    end
+    vsinfo.configflags = os.args(flags)
+
     -- load targets
     local targets = {}
-    vsinfo._sub2 = {}
+    vsinfo._arch_modes = {}
     for _, mode in ipairs(vsinfo.modes) do
-        vsinfo._sub2[mode] = {}
+        vsinfo._arch_modes[mode] = {}
         for _, arch in ipairs(vsinfo.archs) do
-            vsinfo._sub2[mode][arch] = { mode = mode, arch = arch }
+            vsinfo._arch_modes[mode][arch] = { mode = mode, arch = arch }
 
             -- trace
             print("checking for %s.%s ...", mode, arch)
@@ -293,30 +390,41 @@ function main(outputdir, vsinfo)
             config.set("mode", mode, {readonly = true, force = true})
             config.set("arch", arch, {readonly = true, force = true})
 
-            -- clear project to reload and recheck it
-            project.clear()
+            -- clear all options
+            for _, opt in ipairs(project.options()) do
+                opt:clear()
+            end
 
-            -- check configure
-            config.check()
+            -- clear cache
+            memcache.clear()
+            localcache.clear("config")
+            localcache.clear("detect")
+            localcache.clear("option")
+            localcache.clear("package")
+            localcache.clear("toolchain")
+
+            -- check platform
+            platform.load(config.plat(), arch):check()
 
             -- check project options
             project.check()
 
-            -- reload platform
-            platform.load(config.plat())
+            -- install and update requires
+            install_requires()
 
-            -- re-generate configheader
-            generate_configheader()
+            -- config targets
+            _config_targets()
 
-            -- re-generate configfiles
+            -- update config files
             generate_configfiles()
+            generate_configheader()
 
             -- ensure to enter project directory
             os.cd(project.directory())
 
             -- save targets
             for targetname, target in pairs(project.targets()) do
-                if not target:isphony() then
+                if not target:is_phony() then
 
                     -- make target with the given mode and arch
                     targets[targetname] = targets[targetname] or {}
@@ -326,39 +434,37 @@ function main(outputdir, vsinfo)
                     _target.target = targetname
                     _target.vcxprojdir = path.join(vsinfo.solution_dir, targetname)
                     _target.target_id = hash.uuid4(targetname)
-                    _target.kind = target:targetkind()
+                    _target.kind = target:kind()
                     _target.scriptdir = path.relative(target:scriptdir(), _target.vcxprojdir)
                     _target.projectdir = path.relative(project.directory(), _target.vcxprojdir)
                     local targetdir = target:get("targetdir")
                     if targetdir then _target.targetdir = path.relative(targetdir, _target.vcxprojdir) end
-                    _target._sub = _target._sub or {}
-                    _target._sub[mode] = _target._sub[mode] or {}
+                    _target._targets = _target._targets or {}
+                    _target._targets[mode] = _target._targets[mode] or {}
                     local targetinfo = _make_targetinfo(mode, arch, target)
-                    _target._sub[mode][arch] = targetinfo
+                    _target._targets[mode][arch] = targetinfo
                     _target.sdkver = targetinfo.sdkver
-                    _target.cxxlanguage = targetinfo.cxxlanguage
 
                     -- save all sourcefiles and headerfiles
                     _target.sourcefiles = table.unique(table.join(_target.sourcefiles or {}, (target:sourcefiles())))
                     _target.headerfiles = table.unique(table.join(_target.headerfiles or {}, (target:headerfiles())))
 
+                    -- save deps
                     _target.deps = table.unique(table.join(_target.deps or {}, table.keys(target:deps()), nil))
                 end
             end
         end
     end
-
-    -- leave project directory
     os.cd(oldir)
     for _, target in pairs(targets) do
-        target._sub2 = {}
+        target._paths = {}
         local dirs = {}
         local root = project.directory()
         target.sourcefiles = table.imap(target.sourcefiles, function(_, v) return path.relative(v, root) end)
         target.headerfiles = table.imap(target.headerfiles, function(_, v) return path.relative(v, root) end)
         for _, f in ipairs(table.join(target.sourcefiles, target.headerfiles)) do
             local dir = path.directory(f)
-            target._sub2[f] =
+            target._paths[f] =
             {
                 path = _escape(f),
                 dir = _escape(dir)
@@ -374,14 +480,34 @@ function main(outputdir, vsinfo)
                 dir = path.directory(dir)
             end
         end
-        target._sub3 = dirs
+        target._dirs = dirs
         target.dirs = table.keys(dirs)
-        target._sub4 = {}
+        target._deps = {}
         for _, v in ipairs(target.deps) do
-            target._sub4[v] = targets[v]
+            target._deps[v] = targets[v]
         end
     end
-    vsinfo.targets = table.keys(targets)
-    vsinfo._sub = targets
+
+    -- we need set startup project for default or binary target
+    -- @see https://github.com/xmake-io/xmake/issues/1249
+    local targetnames = {}
+    for targetname, target in pairs(project.targets()) do
+        if not target:is_phony() then
+            if target:get("default") == true then
+                table.insert(targetnames, 1, targetname)
+            elseif target:is_binary() then
+                local first_target = targetnames[1] and project.target(targetnames[1])
+                if not first_target or first_target:is_default() then
+                    table.insert(targetnames, 1, targetname)
+                else
+                    table.insert(targetnames, targetname)
+                end
+            else
+                table.insert(targetnames, targetname)
+            end
+        end
+    end
+    vsinfo.targets = targetnames
+    vsinfo._targets = targets
     return vsinfo
 end

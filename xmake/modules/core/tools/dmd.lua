@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        dmd.lua
@@ -94,7 +94,7 @@ end
 
 -- make the includedir flag
 function nf_includedir(self, dir)
-    return "-I" .. os.args(dir)
+    return {"-I" .. dir}
 end
 
 -- make the sysincludedir flag
@@ -114,20 +114,19 @@ end
 
 -- make the linkdir flag
 function nf_linkdir(self, dir)
-    return "-L-L" .. os.args(dir)
+    return {"-L-L" .. dir}
 end
 
 -- make the rpathdir flag
 function nf_rpathdir(self, dir)
     dir = path.translate(dir)
     if self:has_flags("-L-rpath=" .. dir, "ldflags") then
-        return "-L-rpath=" .. os.args(dir:gsub("@[%w_]+", function (name)
+        return {"-L-rpath=" .. (dir:gsub("@[%w_]+", function (name)
             local maps = {["@loader_path"] = "$ORIGIN", ["@executable_path"] = "$ORIGIN"}
             return maps[name]
-        end))
-
+        end))}
     elseif self:has_flags("-L-rpath -L" .. dir, "ldflags") then
-        return "-L-rpath -L" .. os.args(dir:gsub("%$ORIGIN", "@loader_path"))
+        return {"-L-rpath", "-L" .. (dir:gsub("%$ORIGIN", "@loader_path"))}
     end
 end
 

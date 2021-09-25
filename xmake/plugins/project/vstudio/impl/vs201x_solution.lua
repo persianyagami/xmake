@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        vs201x_solution.lua
@@ -40,26 +40,50 @@ end
 -- make projects
 function _make_projects(slnfile, vsinfo)
 
-    -- the vstudio tool uuid for vc project
-    local vctool = "8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942"
-
     -- make all targets
+    local groups = {}
+    local targets = {}
+    local vctool = "8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942"
     for targetname, target in pairs(project.targets()) do
-        if not target:isphony() then
-
-            -- enter project
-            slnfile:enter("Project(\"{%s}\") = \"%s\", \"%s\\%s.vcxproj\", \"{%s}\"", vctool, targetname, targetname, targetname, hash.uuid4(targetname))
-
-            -- add dependences
-            for _, dep in ipairs(target:get("deps")) do
-                slnfile:enter("ProjectSection(ProjectDependencies) = postProject")
-                slnfile:print("{%s} = {%s}", hash.uuid4(dep), hash.uuid4(dep))
-                slnfile:leave("EndProjectSection")
+        if not target:is_phony() then
+            -- we need set startup project for default or binary target
+            -- @see https://github.com/xmake-io/xmake/issues/1249
+            if target:get("default") == true then
+                table.insert(targets, 1, target)
+            elseif target:is_binary() then
+                local first_target = targets[1]
+                if not first_target or first_target:is_default() then
+                    table.insert(targets, 1, target)
+                else
+                    table.insert(targets, target)
+                end
+            else
+                table.insert(targets, target)
             end
-
-            -- leave project
-            slnfile:leave("EndProject")
         end
+    end
+    for _, target in ipairs(targets) do
+        local targetname = target:name()
+        slnfile:enter("Project(\"{%s}\") = \"%s\", \"%s\\%s.vcxproj\", \"{%s}\"", vctool, targetname, targetname, targetname, hash.uuid4(targetname))
+        for _, dep in ipairs(target:get("deps")) do
+            slnfile:enter("ProjectSection(ProjectDependencies) = postProject")
+            slnfile:print("{%s} = {%s}", hash.uuid4(dep), hash.uuid4(dep))
+            slnfile:leave("EndProjectSection")
+        end
+        slnfile:leave("EndProject")
+        local group_path = target:get("group")
+        if group_path then
+            for _, group_name in ipairs(path.split(group_path)) do
+                groups[group_name] = hash.uuid4(group_name)
+            end
+        end
+    end
+
+    -- make all groups
+    local project_group_uuid = "2150E333-8FDC-42A3-9474-1A3956D46DE8"
+    for group_name, group_uuid in pairs(groups) do
+        slnfile:enter("Project(\"{%s}\") = \"%s\", \"%s\", \"{%s}\"", project_group_uuid, group_name, group_name, group_uuid)
+        slnfile:leave("EndProject")
     end
 end
 
@@ -81,7 +105,7 @@ function _make_global(slnfile, vsinfo)
     -- add project configuration platforms
     slnfile:enter("GlobalSection(ProjectConfigurationPlatforms) = postSolution")
     for targetname, target in pairs(project.targets()) do
-        if not target:isphony() then
+        if not target:is_phony() then
             for _, mode in ipairs(vsinfo.modes) do
                 for _, arch in ipairs(vsinfo.archs) do
                     local vs_arch = _vs_arch(arch)
@@ -96,6 +120,31 @@ function _make_global(slnfile, vsinfo)
     -- add solution properties
     slnfile:enter("GlobalSection(SolutionProperties) = preSolution")
     slnfile:print("HideSolutionNode = FALSE")
+    slnfile:leave("EndGlobalSection")
+
+    -- add project groups
+    slnfile:enter("GlobalSection(NestedProjects) = preSolution")
+    local subgroups = {}
+    for targetname, target in pairs(project.targets()) do
+        if not target:is_phony() then
+            local group_path = target:get("group")
+            if group_path then
+                -- target -> group
+                local group_name = path.filename(group_path)
+                slnfile:print("{%s} = {%s}", hash.uuid4(targetname), hash.uuid4(group_name))
+                -- group -> group -> ...
+                local group_names = path.split(group_path)
+                for idx, group_name in ipairs(group_names) do
+                    local key = group_name .. (group_name_sub or "")
+                    local group_name_sub = group_names[idx + 1]
+                    if group_name_sub and not subgroups[key] then
+                        slnfile:print("{%s} = {%s}", hash.uuid4(group_name_sub), hash.uuid4(group_name))
+                        subgroups[key] = true
+                    end
+                end
+            end
+        end
+    end
     slnfile:leave("EndGlobalSection")
 
     -- leave global
