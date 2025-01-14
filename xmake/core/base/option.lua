@@ -12,18 +12,19 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        option.lua
 --
 
 -- define module: option
-local option = option or {}
+local option = {}
 
 -- load modules
 local cli       = require("base/cli")
 local table     = require("base/table")
+local tty       = require("base/tty")
 local colors    = require("base/colors")
 local text      = require("base/text")
 
@@ -63,8 +64,6 @@ end
 
 -- get the top context
 function option._context()
-
-    -- the contexts
     local contexts = option._CONTEXTS
     if contexts then
         return contexts[#contexts]
@@ -73,29 +72,17 @@ end
 
 -- save context
 function option.save(taskname)
-
-    -- init contexts
     option._CONTEXTS = option._CONTEXTS or {}
-
-    -- new a context
     local context = {options = {}, defaults = {}, taskname = taskname}
-
-    -- init defaults
     if taskname then
         context.defaults = option.defaults(taskname) or context.defaults
     end
-
-    -- push this new context to the top stack
     table.insert(option._CONTEXTS, context)
-
-    -- ok
     return context
 end
 
 -- restore context
 function option.restore()
-
-    -- pop it
     if option._CONTEXTS then
         table.remove(option._CONTEXTS)
     end
@@ -411,8 +398,6 @@ end
 
 -- get the given default option value for the current task
 function option.default(name)
-
-    -- check
     assert(name)
 
     -- the defaults
@@ -499,14 +484,14 @@ function option.show_logo(logo, opt)
 
     -- make rainbow for logo
     opt = opt or {}
-    if colors.truecolor() or colors.color256() then
+    if tty.has_color24() or tty.has_color256() then
         local lines = {}
         local seed  = opt.seed or 236
         for _, line in ipairs(logo:split("\n")) do
             local i = 0
             local line2 = ""
             line:gsub(".", function (c)
-                local code = colors.truecolor() and colors.rainbow24(i, seed) or colors.rainbow256(i, seed)
+                local code = tty.has_color24() and colors.rainbow24(i, seed) or colors.rainbow256(i, seed)
                 line2 = string.format("%s${bright %s}%s", line2, code, c)
                 i = i + 1
             end)
@@ -659,7 +644,7 @@ function option.show_main()
             table.insert(tablecontent, {{string.format("%s%ss: ", string.sub(category.name, 1, 1):upper(), string.sub(category.name, 2)), style="${reset bright}"}})
 
             -- print tasks
-            for taskname, taskinfo in pairs(category.tasks) do
+            for taskname, taskinfo in table.orderpairs(category.tasks) do
 
                 -- init the task line
                 local taskline = string.format(narrow and "  %s%s" or "    %s%s",
@@ -686,8 +671,6 @@ end
 
 -- show the options menu
 function option.show_options(options, taskname)
-
-    -- check
     assert(options)
 
     -- remove repeat empty lines
@@ -695,17 +678,16 @@ function option.show_options(options, taskname)
     local emptyline_count = 0
     local printed_options = {}
     for _, opt in ipairs(options) do
-        if not opt[1] and not opt[2] then
-            emptyline_count = emptyline_count + 1
-        else
-            emptyline_count = 0
+        if opt.category and printed_options[#printed_options].category then
+            table.remove(printed_options)
         end
-        if emptyline_count < 2 then
-            table.insert(printed_options, opt)
-        end
+        table.insert(printed_options, opt)
         if opt.category and opt.category == "action" then
             is_action = true
         end
+    end
+    if printed_options[#printed_options].category then
+        table.remove(printed_options)
     end
 
     -- narrow mode?
@@ -721,19 +703,23 @@ function option.show_options(options, taskname)
     end
 
     -- print options
+    local categories = {}
     for _, opt in ipairs(printed_options) do
-
         if opt.category and opt.category == "action" then
-
             -- the following options are belong action? show command section
             --
             -- @see core/base/task.lua: translate menu
             --
             table.insert(tablecontent, {})
             table.insert(tablecontent, {{"Command options (" .. taskname .. "):", style="${reset bright}"}})
+        elseif opt.category and opt.category ~= "." then
+            local category_root = opt.category:split("/")[1]
+            if not categories[category_root] then
+                table.insert(tablecontent, {})
+                table.insert(tablecontent, {{"Command options (" .. opt.category .. "):", style="${reset bright}"}})
+                categories[category_root] = true
+            end
         elseif opt[3] == nil then
-
-            -- insert empty line
             table.insert(tablecontent, {})
         else
 
@@ -804,7 +790,7 @@ function option.show_options(options, taskname)
             -- append values
             local values = opt.values
             if type(values) == "function" then
-                values = values()
+                values = values(false, {helpmenu = true})
             end
             if values then
                 for _, value in ipairs(table.wrap(values)) do

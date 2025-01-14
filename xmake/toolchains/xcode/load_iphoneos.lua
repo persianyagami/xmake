@@ -12,51 +12,45 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        load_iphoneos.lua
 --
 
--- imports
-import("core.project.config")
-
--- main entry
 function main(toolchain)
 
     -- init architecture
     local arch = toolchain:arch()
-    local simulator = (arch == "i386" or arch == "x86_64")
+    local xcode_sdkver  = toolchain:config("xcode_sdkver")
+    local xcode_sysroot = toolchain:config("xcode_sysroot")
 
-    -- init platform name
-    local platname = simulator and "iPhoneSimulator" or "iPhoneOS"
+    -- is simulator?
+    local simulator = toolchain:config("appledev") == "simulator"
 
     -- init target minimal version
-    local target_minver = config.get("target_minver_iphoneos")
+    local target_minver = toolchain:config("target_minver")
     if target_minver and tonumber(target_minver) > 10 and (arch == "armv7" or arch == "armv7s" or arch == "i386") then
         target_minver = "10" -- iOS 10 is the maximum deployment target for 32-bit targets
     end
     local target_minver_flags = (simulator and "-mios-simulator-version-min=" or "-miphoneos-version-min=") .. target_minver
 
-    -- init the xcode sdk directory
-    local xcode_dir     = config.get("xcode")
-    local xcode_sdkver  = config.get("xcode_sdkver_iphoneos")
-    local xcode_sdkdir  = format("%s/Contents/Developer/Platforms/%s.platform/Developer/SDKs/%s%s.sdk", xcode_dir, platname, platname, xcode_sdkver)
-
     -- init flags for c/c++
-    toolchain:add("cxflags", "-arch " .. arch, target_minver_flags, "-isysroot " .. xcode_sdkdir)
-    toolchain:add("ldflags", "-arch " .. arch, "-ObjC", "-lstdc++", "-fobjc-link-runtime", target_minver_flags, "-isysroot " .. xcode_sdkdir)
-    toolchain:add("shflags", "-arch " .. arch, "-ObjC", "-lstdc++", "-fobjc-link-runtime", target_minver_flags, "-isysroot " .. xcode_sdkdir)
+    toolchain:add("cxflags", "-arch", arch, target_minver_flags, "-isysroot", xcode_sysroot)
+    toolchain:add("ldflags", "-arch", arch, "-ObjC", "-fobjc-link-runtime", target_minver_flags, "-isysroot", xcode_sysroot)
+    toolchain:add("shflags", "-arch", arch, "-ObjC", "-fobjc-link-runtime", target_minver_flags, "-isysroot", xcode_sysroot)
 
     -- init flags for objc/c++
-    toolchain:add("mxflags", "-arch " .. arch, target_minver_flags, "-isysroot " .. xcode_sdkdir)
+    toolchain:add("mxflags", "-arch", arch, target_minver_flags, "-isysroot", xcode_sysroot)
+    -- we can use `add_mxflags("-fno-objc-arc")` to override it in xmake.lua
+    toolchain:add("mxflags", "-fobjc-arc")
 
     -- init flags for asm
-    toolchain:add("asflags", "-arch " .. arch, target_minver_flags, "-isysroot " .. xcode_sdkdir)
+    toolchain:add("asflags", "-arch", arch, target_minver_flags, "-isysroot", xcode_sysroot)
 
     -- init flags for swift (with toolchain:add("ldflags and toolchain:add("shflags)
-    toolchain:add("scflags", format("-target %s-apple-ios%s", arch, target_minver) , "-sdk " .. xcode_sdkdir)
-    toolchain:add("scshflags", format("-target %s-apple-ios%s", arch, target_minver) , "-sdk " .. xcode_sdkdir)
-    toolchain:add("scldflags", format("-target %s-apple-ios%s", arch, target_minver) , "-sdk " .. xcode_sdkdir)
+    toolchain:add("scflags", format("-target %s-apple-ios%s", arch, target_minver) , "-sdk " .. xcode_sysroot)
+    toolchain:add("scshflags", format("-target %s-apple-ios%s", arch, target_minver) , "-sdk " .. xcode_sysroot)
+    toolchain:add("scldflags", format("-target %s-apple-ios%s", arch, target_minver) , "-sdk " .. xcode_sysroot)
 end
 

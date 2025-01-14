@@ -15,14 +15,13 @@ function test_vsxmake(t)
     os.cd(tempdir)
 
     -- create project
-    os.runv("xmake", {"create", projname})
+    os.vrunv("xmake", {"create", projname})
     os.cd(projname)
 
     -- set config
     local arch = os.getenv("platform") or "x86"
     config.set("arch", arch, {readonly = true, force = true})
-    config.check()
-    platform.load(config.plat())
+    platform.load(config.plat(), arch):check()
 
     -- create sln & vcxproj
     local vs = config.get("vs")
@@ -42,7 +41,7 @@ function test_vsxmake(t)
         {
             function ()
                 print("--- sln file ---")
-                io.cat(projname .. "_" .. vstype .. ".sln")
+                io.cat(projname .. ".sln")
                 print("--- vcx file ---")
                 io.cat(projname .. "/" .. projname .. ".vcxproj")
                 print("--- filter file ---")
@@ -51,6 +50,56 @@ function test_vsxmake(t)
             end
         }
     }
+
+    -- clean up
+    os.cd(os.scriptdir())
+    os.tryrm(tempdir)
+end
+
+function test_compile_commands(t)
+    local projname = "testproj"
+    local tempdir = os.tmpfile()
+    os.mkdir(tempdir)
+    os.cd(tempdir)
+
+    -- create project
+    os.vrunv("xmake", {"create", projname})
+    os.cd(projname)
+
+    -- generate compile_commands
+    os.vrunv("xmake", {"project", "-k", "compile_commands"})
+
+    -- test autoupdate
+    io.insert("xmake.lua", 1, 'add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode", lsp = "clangd"})')
+    os.vrun("xmake")
+
+    -- clean up
+    os.cd(os.scriptdir())
+    os.tryrm(tempdir)
+end
+
+function test_cmake(t)
+    local cmake = find_tool("cmake")
+    if not cmake then
+        return t:skip("cmake not found")
+    end
+    local projname = "testproj"
+    local tempdir = os.tmpfile()
+    os.mkdir(tempdir)
+    os.cd(tempdir)
+
+    -- create project
+    os.vrunv("xmake", {"create", projname})
+    os.cd(projname)
+
+    -- generate compile_commands
+    os.vrunv("xmake", {"project", "-k", "cmake"})
+
+    -- test build
+    os.mkdir("build")
+    os.cd("build")
+    os.vrunv(cmake.program, {".."})
+    os.vrunv(cmake.program, {"--build", "."})
 
     -- clean up
     os.cd(os.scriptdir())

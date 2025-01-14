@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        llvm_rc.lua
@@ -21,6 +21,7 @@
 -- imports
 import("core.base.option")
 import("core.base.global")
+import("core.project.policy")
 import("core.project.project")
 
 -- init it
@@ -29,17 +30,17 @@ end
 
 -- make the define flag
 function nf_define(self, macro)
-    return "/D " .. macro
+    return {"/D", macro}
 end
 
 -- make the undefine flag
 function nf_undefine(self, macro)
-    return "/U " .. macro
+    return {"/U", macro}
 end
 
 -- make the includedir flag
 function nf_includedir(self, dir)
-    return "/I " .. os.args(dir)
+    return {"/I", dir}
 end
 
 -- make the sysincludedir flag
@@ -53,7 +54,7 @@ function compargv(self, sourcefile, objectfile, flags)
 end
 
 -- compile the source file
-function compile(self, sourcefile, objectfile, dependinfo, flags)
+function compile(self, sourcefile, objectfile, dependinfo, flags, opt)
 
     -- ensure the object directory
     os.mkdir(path.directory(objectfile))
@@ -78,7 +79,7 @@ function compile(self, sourcefile, objectfile, dependinfo, flags)
             function (ok, warnings)
 
                 -- print some warnings
-                if warnings and #warnings > 0 and (option.get("diagnosis") or option.get("warning") or global.get("build_warning")) then
+                if warnings and #warnings > 0 and policy.build_warnings(opt) then
                     cprint("${color.warning}%s", table.concat(table.slice(warnings:split('\n'), 1, 8), '\n'))
                 end
             end

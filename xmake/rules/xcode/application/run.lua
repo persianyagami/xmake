@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        run.lua
@@ -21,7 +21,7 @@
 -- imports
 import("core.base.option")
 import("devel.debugger")
-import("private.action.run.make_runenvs")
+import("private.action.run.runenvs")
 
 -- run on macosx
 function _run_on_macosx(target, opt)
@@ -38,19 +38,13 @@ function _run_on_macosx(target, opt)
     local oldir = os.cd(rundir)
 
     -- add run environments
-    local addrunenvs, setrunenvs = make_runenvs(target)
-    for name, values in pairs(addrunenvs) do
-        os.addenv(name, unpack(table.wrap(values)))
-    end
-    for name, value in pairs(setrunenvs) do
-        os.setenv(name, unpack(table.wrap(value)))
-    end
+    local addrunenvs, setrunenvs = runenvs.make(target)
 
     -- debugging?
     if option.get("debug") then
-        debugger.run(targetfile, option.get("arguments"))
+        debugger.run(targetfile, option.get("arguments"), {addrunenvs = addrunenvs, setrunenvs = setrunenvs})
     else
-        os.execv(targetfile, option.get("arguments"))
+        os.execv(targetfile, option.get("arguments"), {envs = runenvs.join(addrunenvs, setrunenvs)})
     end
 
     -- restore the previous directory
@@ -87,9 +81,9 @@ end
 
 -- main entry
 function main (target, opt)
-    if is_plat("macosx") then
+    if target:is_plat("macosx") then
         _run_on_macosx(target, opt)
-    elseif is_plat("iphoneos") and is_arch("x86_64", "i386") then
+    elseif target:is_plat("iphoneos") and target:is_arch("x86_64", "i386") then
         _run_on_simulator(target, opt)
     else
         raise("we can only run application on macOS or simulator!")

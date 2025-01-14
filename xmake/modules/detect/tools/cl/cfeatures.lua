@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        cfeatures.lua
@@ -31,6 +31,11 @@ function main()
     local msvc_minver = "_MSC_VER >= 1200"
     local msvc_2005   = "_MSC_VER >= 1400"
     local msvc_2010   = "_MSC_VER >= 1600"
+    local msvc_2019   = "_MSC_VER >= 1920"
+
+    -- set language standard supports
+    _set("c_std_89", msvc_2005)
+    _set("c_std_99", msvc_2019)
 
     -- set features
     _set("c_static_assert",       msvc_2010)

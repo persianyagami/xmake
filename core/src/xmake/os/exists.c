@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        exists.c
@@ -42,9 +42,7 @@ tb_int_t xm_os_exists(lua_State* lua)
     tb_char_t const* path = luaL_checkstring(lua, 1);
     tb_check_return_val(path, 0);
 
-    // done os.exists(path)
+    // os.exists(path)
     lua_pushboolean(lua, tb_file_info(path, tb_null));
-
-    // ok
     return 1;
 }

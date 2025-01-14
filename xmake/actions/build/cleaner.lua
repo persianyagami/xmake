@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        cleaner.lua
@@ -26,7 +26,6 @@ import("core.project.config")
 import("core.project.project")
 import("core.package.package")
 import("core.platform.platform")
-import("core.platform.environment")
 
 -- clean up temporary files once a day
 function cleanup()
@@ -37,7 +36,7 @@ function cleanup()
         return
     end
 
-    -- mark as posted first, avoid to post it repeatly
+    -- mark as posted first, avoid posting it repeatly
     io.writefile(markfile, "ok")
 
     -- init argument list
@@ -55,7 +54,7 @@ function cleanup()
     try
     {
         function ()
-            process.openv("xmake", argv, {stdout = path.join(os.tmpdir(), "cleaner.log")}, {detach = true}):close()
+            process.openv(os.programfile(), argv, {stdout = path.join(os.tmpdir(), "cleaner.log"), detach = true}):close()
         end
     }
 end
@@ -86,7 +85,7 @@ function main()
     end
 
     -- clean up the previous month package cache files, @see package.cachedir()
-    local cachedir = path.join(global.directory(), "cache", "packages", os.date("%y%m", os.time() - 31 * 24 * 3600))
+    local cachedir = path.join(package.cachedir({rootonly = true}), os.date("%y%m", os.time() - 31 * 24 * 3600))
     if os.isdir(cachedir) and cachedir ~= package.cachedir() then
         print("cleanup %s ..", cachedir)
         os.tryrm(cachedir)

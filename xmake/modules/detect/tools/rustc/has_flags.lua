@@ -12,21 +12,31 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        has_flags.lua
 --
 
 -- imports
-import("lib.detect.cache")
+import("core.cache.detectcache")
+
+-- is linker?
+function _islinker(flags, opt)
+    local flags_str = table.concat(flags, " ")
+    if flags_str:startswith("-C linkarg=") then
+        return true
+    end
+    local toolkind = opt.toolkind or ""
+    return toolkind == "ld" or toolkind == "sh" or toolkind:endswith("ld") or toolkind:endswith("sh")
+end
 
 -- try running
 function _try_running(...)
 
     local argv = {...}
     local errors = nil
-    return try { function () os.runv(unpack(argv)); return true end, catch { function (errs) errors = (errs or ""):trim() end }}, errors
+    return try { function () os.runv(table.unpack(argv)); return true end, catch { function (errs) errors = (errs or ""):trim() end }}, errors
 end
 
 -- attempt to check it from the argument list
@@ -43,11 +53,8 @@ function _check_from_arglist(flags, opt)
     -- make allflags key
     local flagskey = opt.program .. "_" .. (opt.programver or "")
 
-    -- load cache
-    local cacheinfo  = cache.load(key)
-
     -- get all allflags from argument list
-    local allflags = cacheinfo[flagskey]
+    local allflags = detectcache:get2(key, flagskey)
     if not allflags then
 
         -- get argument list
@@ -60,16 +67,14 @@ function _check_from_arglist(flags, opt)
         end
 
         -- save cache
-        cacheinfo[flagskey] = allflags
-        cache.save(key, cacheinfo)
+        detectcache:set2(key, flagskey, allflags)
+        detectcache:save()
     end
-
-    -- ok?
     return allflags[flags[1]]
 end
 
 -- try running to check flags
-function _check_try_running(flags, opt)
+function _check_try_running(flags, opt, islinker)
 
     -- make an stub source file
     local sourcefile = path.join(os.tmpdir(), "detect", "rustc_has_flags.rs")
@@ -77,14 +82,15 @@ function _check_try_running(flags, opt)
         io.writefile(sourcefile, "fn main() {\n}")
     end
 
-    -- check it
+    -- check flags for linker
+    if islinker then
+        return _try_running(opt.program, table.join("--crate-type=bin", flags, "-o", os.tmpfile(), sourcefile), opt)
+    end
+
+    -- check flags for compiler
     local objectfile = os.tmpfile() .. ".o"
     local ok, errors = _try_running(opt.program, table.join("--emit", "obj", flags, "-o", objectfile, sourcefile))
-
-    -- remove files
     os.tryrm(objectfile)
-
-    -- ok?
     return ok, errors
 end
 
@@ -96,12 +102,15 @@ end
 --
 function main(flags, opt)
 
+    -- is linker?
+    local islinker = _islinker(flags, opt)
+
     -- attempt to check it from the argument list
     if _check_from_arglist(flags, opt) then
         return true
     end
 
     -- try running to check it
-    return _check_try_running(flags, opt)
+    return _check_try_running(flags, opt, islinker)
 end
 

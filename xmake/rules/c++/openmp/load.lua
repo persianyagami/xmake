@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        load.lua
@@ -20,6 +20,7 @@
 
 -- main entry
 function main(target, sourcekind)
+    wprint("we no longer need add_rules(\"%s.openmp\") now, you just need to add add_packages(\"openmp\").", sourcekind == "cxx" and "c++" or "c")
     local _, compiler_name = target:tool(sourcekind)
     local flag_name        = sourcekind == "cxx" and "cxxflags" or "cflags"
     if compiler_name == "cl" then

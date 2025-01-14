@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        load.lua
@@ -20,45 +20,31 @@
 
 -- imports
 import("core.base.option")
+import("core.base.semver")
 import("core.project.config")
 import("detect.sdks.find_vstudio")
 
 -- add the given vs environment
-function _add_vsenv(toolchain, name)
+function _add_vsenv(toolchain, name, curenvs)
 
-    -- get vcvarsall
-    local vcvarsall = config.get("__vcvarsall")
-    if not vcvarsall then
+    -- get vcvars
+    local vcvars = toolchain:config("vcvars")
+    if not vcvars then
         return
     end
 
-    -- get vs environment for the current arch
-    local arch = toolchain:arch()
-    local vsenv = vcvarsall[arch] or {}
-
-    -- switch vstudio environment if vs_sdkver has been changed
-    local switch_vsenv = false
-    local vs = config.get("vs")
-    local vs_sdkver = config.get("vs_sdkver")
-    if vs and vs_sdkver and vsenv.WindowsSDKVersion and vs_sdkver ~= vsenv.WindowsSDKVersion then
-        switch_vsenv = true
-    end
-    if switch_vsenv then
-        -- find vstudio
-        local vstudio = find_vstudio({vcvars_ver = config.get("vs_toolset"), sdkver = vs_sdkver})
-        if vstudio then
-            vcvarsall = (vstudio[vs] or {}).vcvarsall or {}
-            vsenv = vcvarsall[arch] or {}
-            if vsenv and vsenv.PATH and vsenv.INCLUDE and vsenv.LIB then
-                config.set("__vcvarsall", vcvarsall)
+    -- get the paths for the vs environment
+    local new = vcvars[name]
+    if new then
+        -- fix case naming conflict for cmake/msbuild between the new msvc envs and current environment, if we are running xmake in vs prompt.
+        -- @see https://github.com/xmake-io/xmake/issues/4751
+        for k, c in pairs(curenvs) do
+            if name:lower() == k:lower() and name ~= k then
+                name = k
+                break
             end
         end
-    end
-
-    -- get the paths for the vs environment
-    local new = vsenv[name]
-    if new then
-        toolchain:add("runenvs", name:upper(), path.splitenv(new))
+        toolchain:add("runenvs", name, table.unwrap(path.splitenv(new)))
     end
 end
 
@@ -69,23 +55,40 @@ function main(toolchain)
     toolchain:set("toolset", "cc",  "cl.exe")
     toolchain:set("toolset", "cxx", "cl.exe")
     toolchain:set("toolset", "mrc", "rc.exe")
-    if toolchain:is_arch("x64") then
-        toolchain:set("toolset", "as",  "ml64.exe")
-    else
+    if toolchain:is_arch("x86") then
         toolchain:set("toolset", "as",  "ml.exe")
+    elseif toolchain:is_arch("arm64", "arm64ec") then
+        toolchain:set("toolset", "as",  "armasm64_msvc@armasm64.exe")
+    elseif toolchain:is_arch("arm.*") then
+        toolchain:set("toolset", "as",  "armasm_msvc@armasm.exe")
+    else
+        toolchain:set("toolset", "as",  "ml64.exe")
     end
     toolchain:set("toolset", "ld",  "link.exe")
     toolchain:set("toolset", "sh",  "link.exe")
     toolchain:set("toolset", "ar",  "link.exe")
-    toolchain:set("toolset", "ex",  "lib.exe")
+
+    -- init flags
+    if toolchain:is_arch("arm64ec") then
+        toolchain:add("cxflags", "/arm64EC")
+    end
 
     -- add vs environments
-    _add_vsenv(toolchain, "PATH")
-    _add_vsenv(toolchain, "LIB")
-    _add_vsenv(toolchain, "INCLUDE")
-    _add_vsenv(toolchain, "LIBPATH")
+    local expect_vars = {"PATH", "LIB", "INCLUDE", "LIBPATH"}
+    local curenvs = os.getenvs()
+    for _, name in ipairs(expect_vars) do
+        _add_vsenv(toolchain, name, curenvs)
+    end
+    for _, name in ipairs(find_vstudio.get_vcvars()) do
+        if not table.contains(expect_vars, name:upper()) then
+            _add_vsenv(toolchain, name, curenvs)
+        end
+    end
 
-    -- add some default flags
-    toolchain:add("cxxflags", "/EHsc")
+    -- check and add vs_binary_output env
+    local vs = toolchain:config("vs")
+    if vs and semver.is_valid(vs) and semver.compare(vs, "2005") < 0 then
+        toolchain:add("runenvs", "VS_BINARY_OUTPUT", "1")
+    end
 end
 

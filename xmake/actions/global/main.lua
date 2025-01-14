@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -22,6 +22,7 @@
 import("core.base.option")
 import("core.base.global")
 import("core.theme.theme")
+import("core.cache.global_detectcache")
 import("menuconf", {alias = "menuconf_show"})
 
 -- main
@@ -67,6 +68,12 @@ function main()
 
     -- save it
     global.save()
+
+    -- clear detect cache
+    if option.get("clean") or option.get("check") then
+        global_detectcache:clear()
+        global_detectcache:save()
+    end
 
     -- dump it
     global.dump()

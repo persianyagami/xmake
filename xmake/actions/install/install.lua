@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        install.lua
@@ -49,7 +49,7 @@ end
 function _install_target(target)
 
     -- has been disabled?
-    if target:get("enabled") == false then
+    if not target:is_enabled() then
         return
     end
 
@@ -57,11 +57,7 @@ function _install_target(target)
     local oldir = os.cd(project.directory())
 
     -- enter the environments of the target packages
-    local oldenvs = {}
-    for name, values in pairs(target:pkgenvs()) do
-        oldenvs[name] = os.getenv(name)
-        os.addenv(name, unpack(values))
-    end
+    local oldenvs = os.addenvs(target:pkgenvs())
 
     -- the target scripts
     local scripts =
@@ -96,9 +92,7 @@ function _install_target(target)
     end
 
     -- leave the environments of the target packages
-    for name, values in pairs(oldenvs) do
-        os.setenv(name, values)
-    end
+    os.setenvs(oldenvs)
 
     -- leave project directory
     os.cd(oldir)
@@ -112,20 +106,20 @@ function _install_targets(targets)
 end
 
 -- install targets
-function main(targetname)
-
-    -- install the given target?
+function main(targetname, group_pattern)
+    local targets = {}
     if targetname and not targetname:startswith("__") then
         local target = project.target(targetname)
-        _install_targets(target:orderdeps())
-        _install_target(target)
+        table.insert(targets, target)
     else
-        -- install default or all targets
         for _, target in ipairs(project.ordertargets()) do
-            local default = target:get("default")
-            if default == nil or default == true or targetname == "__all" then
-                _install_target(target)
+            local group = target:get("group")
+            if (target:is_default() and not group_pattern) or targetname == "__all" or (group_pattern and group and group:match(group_pattern)) then
+                table.insert(targets, target)
             end
         end
+    end
+    if #targets > 0 then
+        _install_targets(table.unique(targets))
     end
 end

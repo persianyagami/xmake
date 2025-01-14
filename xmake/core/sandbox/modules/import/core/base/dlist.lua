@@ -12,11 +12,11 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        dlist.lua
 --
 
 -- return module
-return require("base/dlist")
+return require("base/list")

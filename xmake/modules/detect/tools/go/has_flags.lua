@@ -12,14 +12,14 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        has_flags.lua
 --
 
 -- imports
-import("lib.detect.cache")
+import("core.cache.detectcache")
 import("core.language.language")
 
 -- is linker?
@@ -35,7 +35,7 @@ function _try_running(...)
 
     local argv = {...}
     local errors = nil
-    return try { function () os.runv(unpack(argv)); return true end, catch { function (errs) errors = (errs or ""):trim() end }}, errors
+    return try { function () os.runv(table.unpack(argv)); return true end, catch { function (errs) errors = (errs or ""):trim() end }}, errors
 end
 
 -- attempt to check it from the argument list
@@ -52,11 +52,8 @@ function _check_from_arglist(flags, opt, islinker)
     -- make flags key
     local flagskey = opt.program .. "_" .. (opt.programver or "")
 
-    -- load cache
-    local cacheinfo  = cache.load(key)
-
     -- get all flags from argument list
-    local allflags = cacheinfo[flagskey]
+    local allflags = detectcache:get2(key, flagskey)
     if not allflags then
 
         -- attempt to get argument list from the error info (help menu)
@@ -78,11 +75,9 @@ function _check_from_arglist(flags, opt, islinker)
         }
 
         -- save cache
-        cacheinfo[flagskey] = allflags
-        cache.save(key, cacheinfo)
+        detectcache:set2(key, flagskey, allflags)
+        detectcache:save()
     end
-
-    -- ok?
     return allflags[flags[1]]
 end
 

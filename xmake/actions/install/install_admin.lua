@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        install_admin.lua
@@ -25,34 +25,30 @@ import("core.project.project")
 import("core.platform.platform")
 import("install")
 
--- install
-function main(targetname, installdir, prefix)
+function main(targetname, group_pattern, installdir, prefix)
+    local verbose = option.get("verbose")
+    if group_pattern and #group_pattern == 0 then
+        group_pattern = nil
+    end
+    if installdir and #installdir == 0 then
+        installdir = nil
+    end
 
-    -- enter project directory
     os.cd(project.directory())
-
-    -- load config
     config.load()
-
-    -- load platform
     platform.load(config.plat())
 
     -- save the current option and push a new option context
     option.save()
-
-    -- pass installdir to option
+    option.set("verbose", verbose)
     if installdir then
         option.set("installdir", installdir)
     end
-
-    -- pass prefix to option
     if prefix then
         option.set("prefix", prefix)
     end
 
     -- install target
-    install(targetname)
-
-    -- restore the previous option context
+    install(targetname, group_pattern)
     option.restore()
 end

@@ -12,13 +12,14 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        print.lua
 --
 
 -- load modules
+local table     = require("base/table")
 local try       = require("sandbox/modules/try")
 local catch     = require("sandbox/modules/catch")
 
@@ -33,13 +34,13 @@ function _print(format, ...)
         {
             function ()
                 -- attempt to print format string first
-                io.write(string.format(format, unpack(args)) .. "\n")
+                io.write(string.format(format, table.unpack(args)) .. "\n")
             end,
             catch
             {
                 function ()
                     -- print multi-variables with raw lua action
-                    print(format, unpack(args))
+                    print(format, table.unpack(args))
                 end
             }
         }

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -25,7 +25,7 @@ rule("xcode.bundle")
     add_deps("xcode.info_plist")
 
     -- we must set kind before target.on_load(), may we will use target in on_load()
-    before_load(function (target)
+    on_load(function (target)
 
         -- get bundle directory
         local targetdir = target:targetdir()
@@ -35,22 +35,31 @@ rule("xcode.bundle")
         -- get contents and resources directory
         local contentsdir = bundledir
         local resourcesdir = bundledir
-        if is_plat("macosx") then
+        if target:is_plat("macosx") then
             contentsdir = path.join(bundledir, "Contents")
             resourcesdir = path.join(bundledir, "Contents", "Resources")
         end
         target:data_set("xcode.bundle.contentsdir", contentsdir)
         target:data_set("xcode.bundle.resourcesdir", resourcesdir)
 
-        -- set target info for bundle
-        target:set("filename", target:basename())
+        -- register clean files for `xmake clean`
+        target:add("cleanfiles", bundledir)
 
         -- generate binary as bundle, we cannot set `-shared` or `-dynamiclib`
         target:set("kind", "binary")
-        target:add("ldflags", "-bundle", {force = true})
 
-        -- register clean files for `xmake clean`
-        target:add("cleanfiles", bundledir)
+        -- set target info for bundle
+        target:set("filename", target:basename())
+    end)
+
+    on_config(function (target)
+        -- add bundle flags
+        local linker = target:linker():name()
+        if linker == "swiftc" then
+            target:add("ldflags", "-Xlinker -bundle", {force = true})
+        else
+            target:add("ldflags", "-bundle", {force = true})
+        end
     end)
 
     after_build(function (target, opt)
@@ -60,7 +69,7 @@ rule("xcode.bundle")
         import("core.theme.theme")
         import("core.project.depend")
         import("private.tools.codesign")
-        import("private.utils.progress")
+        import("utils.progress")
 
         -- get bundle and resources directory
         local bundledir = path.absolute(target:data("xcode.bundle.rootdir"))
@@ -74,7 +83,7 @@ rule("xcode.bundle")
             progress.show(opt.progress, "${color.build.target}generating.xcode.$(mode) %s", path.filename(bundledir))
 
             -- copy target file
-            if is_plat("macosx") then
+            if target:is_plat("macosx") then
                 os.vcp(target:targetfile(), path.join(contentsdir, "MacOS", path.filename(target:targetfile())))
             else
                 os.vcp(target:targetfile(), path.join(contentsdir, path.filename(target:targetfile())))
@@ -100,7 +109,7 @@ rule("xcode.bundle")
             end
             codesign(bundledir, codesign_identity)
 
-        end, {dependfile = target:dependfile(bundledir), files = {bundledir, target:targetfile()}})
+        end, {dependfile = target:dependfile(bundledir), files = {bundledir, target:targetfile()}, changed = target:is_rebuilt()})
     end)
 
     on_install(function (target)

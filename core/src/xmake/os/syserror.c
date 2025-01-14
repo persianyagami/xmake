@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        syserror.c
@@ -45,6 +45,9 @@ tb_int_t xm_os_syserror(lua_State* lua)
     {
     case TB_STATE_SYSERROR_NOT_PERM:            err = 1; break;
     case TB_STATE_SYSERROR_NOT_FILEDIR:         err = 2; break;
+#if ((TB_VERSION_MAJOR * 100) + (TB_VERSION_MINOR * 10) + TB_VERSION_ALTER) >= 173
+    case TB_STATE_SYSERROR_NOT_ACCESS:          err = 3; break;
+#endif
     case TB_STATE_SYSERROR_UNKNOWN_ERROR:       err = -1; break;
     }
     lua_pushinteger(lua, err);

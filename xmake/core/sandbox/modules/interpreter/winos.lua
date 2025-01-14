@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        winos.lua
@@ -25,9 +25,11 @@ local winos = require("base/winos")
 local sandbox_winos = sandbox_winos or {}
 
 -- export some readonly interfaces
-sandbox_winos.registry_query = winos.registry_query
-sandbox_winos.logical_drives = winos.logical_drives
-sandbox_winos.version        = winos.version
+sandbox_winos.registry_query  = winos.registry_query
+sandbox_winos.registry_keys   = winos.registry_keys
+sandbox_winos.registry_values = winos.registry_values
+sandbox_winos.logical_drives  = winos.logical_drives
+sandbox_winos.version         = winos.version
 
 -- return module
 return sandbox_winos

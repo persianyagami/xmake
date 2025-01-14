@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        build.lua
@@ -23,7 +23,7 @@ import("core.base.option")
 import("core.theme.theme")
 import("core.project.depend")
 import("private.tools.codesign")
-import("private.utils.progress")
+import("utils.progress")
 
 -- main entry
 function main (target, opt)
@@ -32,6 +32,7 @@ function main (target, opt)
     local bundledir = path.absolute(target:data("xcode.bundle.rootdir"))
     local contentsdir = path.absolute(target:data("xcode.bundle.contentsdir"))
     local resourcesdir = path.absolute(target:data("xcode.bundle.resourcesdir"))
+    local frameworksdir = path.join(contentsdir, "Frameworks")
 
     -- do build if changed
     depend.on_changed(function ()
@@ -41,19 +42,34 @@ function main (target, opt)
 
         -- copy target file
         local binarydir = contentsdir
-        if is_plat("macosx") then
+        if target:is_plat("macosx") then
             binarydir = path.join(contentsdir, "MacOS")
         end
         os.vcp(target:targetfile(), path.join(binarydir, path.filename(target:targetfile())))
 
-        -- copy dependent dynamic libraries, TODO copy frameworks
+        -- change rpath
+        -- @see https://github.com/xmake-io/xmake/issues/2679#issuecomment-1221839215
+        local targetfile = path.join(binarydir, path.filename(target:targetfile()))
+        try { function () os.vrunv("install_name_tool", {"-delete_rpath", "@loader_path", targetfile}) end }
+        os.vrunv("install_name_tool", {"-add_rpath", "@executable_path/../Frameworks", targetfile})
+
+        -- copy dependent dynamic libraries and frameworks
         for _, dep in ipairs(target:orderdeps()) do
-            if dep:targetkind() == "shared" then
-                os.vcp(dep:targetfile(), binarydir)
+            if dep:kind() == "shared" then
+                if not os.isdir(frameworksdir) then
+                    os.mkdir(frameworksdir)
+                end
+                local frameworkdir = dep:data("xcode.bundle.rootdir")
+                if dep:rule("xcode.framework") and frameworkdir then
+                    os.cp(frameworkdir, frameworksdir, {symlink = true})
+                else
+                    os.vcp(dep:targetfile(), frameworksdir)
+                end
             end
         end
 
         -- copy PkgInfo to the contents directory
+        os.mkdir(resourcesdir)
         os.vcp(path.join(os.programdir(), "scripts", "PkgInfo"), resourcesdir)
 
         -- copy resource files to the resources directory
@@ -72,7 +88,7 @@ function main (target, opt)
         -- generate embedded.mobileprovision to *.app/embedded.mobileprovision
         local mobile_provision_embedded = path.join(bundledir, "embedded.mobileprovision")
         local mobile_provision = target:values("xcode.mobile_provision") or get_config("xcode_mobile_provision")
-        if mobile_provision and is_plat("iphoneos") then
+        if mobile_provision and target:is_plat("iphoneos") then
             os.tryrm(mobile_provision_embedded)
             local provisions = codesign.mobile_provisions()
             if provisions then
@@ -90,6 +106,6 @@ function main (target, opt)
         end
         codesign(bundledir, codesign_identity, mobile_provision, {deep = true})
 
-    end, {dependfile = target:dependfile(bundledir), files = {bundledir, target:targetfile()}})
+    end, {dependfile = target:dependfile(bundledir), files = {bundledir, target:targetfile()}, changed = target:is_rebuilt()})
 end
 

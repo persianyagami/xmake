@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -20,12 +20,12 @@
 
 -- define rule: c.openmp
 rule("c.openmp")
-    on_load(function (target)
+    on_config(function (target)
         import("load")(target, "cc")
     end)
 
 -- define rule: c++.openmp
 rule("c++.openmp")
-    on_load(function (target)
+    on_config(function (target)
         import("load")(target, "cxx")
     end)

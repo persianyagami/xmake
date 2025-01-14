@@ -12,44 +12,61 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define toolchain
 toolchain("emcc")
 
-    -- set homepage
     set_homepage("http://emscripten.org")
     set_description("A toolchain for compiling to asm.js and WebAssembly")
 
-    -- mark as standalone toolchain
     set_kind("standalone")
 
-    -- add suffix for windows
     local suffix = is_host("windows") and ".bat" or ""
-
-    -- set toolset
     set_toolset("cc", "emcc" .. suffix)
     set_toolset("cxx", "emcc" .. suffix, "em++" .. suffix)
     set_toolset("ld", "em++" .. suffix, "emcc" .. suffix)
     set_toolset("sh", "em++" .. suffix, "emcc" .. suffix)
     set_toolset("ar", "emar" .. suffix)
-    set_toolset("ex", "emar" .. suffix)
     set_toolset("as", "emcc" .. suffix)
+    set_toolset("ranlib", "emranlib" .. suffix)
 
-    -- check toolchain
     on_check(function (toolchain)
-        return import("lib.detect.find_tool")("emcc")
+        import("lib.detect.find_tool")
+        import("detect.sdks.find_emsdk")
+        for _, package in ipairs(toolchain:packages()) do
+            local installdir = package:installdir()
+            if installdir and os.isdir(installdir) then
+                local emsdk = find_emsdk(installdir)
+                if emsdk then
+                    toolchain:config_set("bindir", emsdk.emscripten)
+                    toolchain:config_set("sdkdir", emsdk.sdkdir)
+                    toolchain:configs_save()
+                    return emsdk
+                end
+            end
+        end
+        return find_tool("emcc")
     end)
 
-    -- on load
     on_load(function (toolchain)
         toolchain:add("cxflags", "")
         toolchain:add("asflags", "")
         toolchain:add("ldflags", "")
         toolchain:add("shflags", "")
+        for _, package in ipairs(toolchain:packages()) do
+            local envs = package:envs()
+            if envs then
+                for _, name in ipairs({"EMSDK", "EMSDK_NODE", "EMSDK_PYTHON", "JAVA_HOME"}) do
+                    local values = envs[name]
+                    if values then
+                        toolchain:add("runenvs", name, table.unwrap(values))
+                    end
+                end
+            end
+        end
     end)
 

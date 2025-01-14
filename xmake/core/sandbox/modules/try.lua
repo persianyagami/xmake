@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        try.lua
@@ -77,12 +77,8 @@ function sandbox_try._traceback(errors)
         else
             results = results .. string.format("    [%s:%d]:\n", info.short_src, info.currentline)
         end
-
-        -- next
         level = level + 1
     end
-
-    -- ok?
     return results
 end
 
@@ -133,7 +129,6 @@ function sandbox_try.try(block)
         funcs.finally(ok, table.unpack(results, 2, results.n))
     end
 
-    -- ok?
     if ok then
         return table.unpack(results, 2, results.n)
     end

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_gn.lua
@@ -42,6 +42,9 @@ function main(opt)
 
     -- find program
     local program = find_program(opt.program or "gn", opt)
+    if not program and is_host("windows") then
+        program = find_program("gn.bat", opt)
+    end
 
     -- find program version
     local version = nil

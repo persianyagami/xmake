@@ -12,41 +12,36 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define platform
 platform("wasm")
-
-    -- set os
     set_os("web")
-
-    -- set hosts
     set_hosts("macosx", "linux", "windows", "bsd")
+    set_archs("wasm32", "wasm64")
 
-    -- set archs
-    set_archs("wasm32")
-
-    -- set formats
     set_formats("static", "lib$(name).a")
     set_formats("object", "$(name).o")
     set_formats("shared", "lib$(name).so")
     set_formats("binary", "$(name).html")
     set_formats("symbol", "$(name).sym")
 
-    -- on check
-    on_check(function (platform)
-        import("core.project.config")
-        local arch = config.get("arch")
-        if not arch then
-            config.set("arch", "wasm32")
-            cprint("checking for architecture ... ${color.success}%s", config.get("arch"))
-        end
-    end)
-
-    -- set toolchains
     set_toolchains("emcc")
+
+    set_menu {
+        config =
+        {
+            {category = "Emscripten Configuration"          }
+        ,   {nil, "emsdk", "kv", nil, "The emsdk directory" }
+        }
+    ,   global =
+        {
+            {category = "Emscripten Configuration"          }
+        ,   {nil, "emsdk", "kv", nil, "The emsdk directory" }
+        }
+    }
+
 

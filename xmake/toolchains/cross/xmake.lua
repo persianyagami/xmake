@@ -12,23 +12,14 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define toolchain
 toolchain("cross")
-
-    -- set descrption
     set_description("Common cross compilation toolchain")
-
-    -- mark as standalone toolchain
-    set_kind("standalone")
-
-    -- check toolchain
+    set_kind("cross")
     on_check("check")
-
-    -- load toolchain
     on_load("load")

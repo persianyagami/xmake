@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        load.lua
@@ -29,7 +29,7 @@ function main (target)
     -- get contents and resources directory
     local contentsdir = bundledir
     local resourcesdir = bundledir
-    if is_plat("macosx") then
+    if target:is_plat("macosx") then
         contentsdir = path.join(bundledir, "Contents")
         resourcesdir = path.join(bundledir, "Contents", "Resources")
     end
@@ -41,28 +41,22 @@ function main (target)
     target:set("filename", target:basename())
 
     -- set install directory
-    if is_plat("macosx") and not target:get("installdir") then
+    if target:is_plat("macosx") and not target:get("installdir") then
         target:set("installdir", "/Applications")
     end
 
     -- add frameworks
-    if is_plat("macosx") then
-        target:add("frameworks", "AppKit")
+    if target:is_plat("macosx") then
+        local xcode = target:toolchain("xcode")
+        if xcode and xcode:config("appledev") == "catalyst" then
+            target:add("frameworks", "UIKit")
+        else
+            target:add("frameworks", "AppKit")
+        end
     else
         target:add("frameworks", "UIKit")
     end
 
     -- register clean files for `xmake clean`
     target:add("cleanfiles", bundledir)
-
-    -- depend xcode.framework? we need disable `build.across_targets_in_parallel` policy
-    local across_targets_in_parallel
-    for _, dep in ipairs(target:orderdeps()) do
-        if dep:rule("xcode.framework") then
-            across_targets_in_parallel = false
-        end
-    end
-    if across_targets_in_parallel ~= nil then
-        target:set("policy", "build.across_targets_in_parallel", across_targets_in_parallel)
-    end
 end
