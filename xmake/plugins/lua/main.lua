@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -22,6 +22,7 @@
 import("core.base.option")
 import("core.sandbox.module")
 import("core.sandbox.sandbox")
+import("core.project.project")
 
 -- get all lua scripts
 function scripts()
@@ -122,7 +123,7 @@ function _run_script(script, args)
     if _is_callable(func) then
         local result = table.pack(func(table.unpack(args, 1, args.n)))
         if printresult and result and result.n ~= 0 then
-            utils.dump(unpack(result, 1, result.n))
+            utils.dump(table.unpack(result, 1, result.n))
         end
     else
         -- dump variables directly
@@ -158,6 +159,9 @@ function _get_args()
 end
 
 function main()
+
+    -- restore to the current working directory
+    os.cd(os.workingdir())
 
     -- list builtin scripts
     if option.get("list") then

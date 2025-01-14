@@ -12,13 +12,12 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define rule
 rule("xcode.storyboard")
 
     -- support add_files("*.storyboard")
@@ -31,7 +30,8 @@ rule("xcode.storyboard")
         import("core.base.option")
         import("core.theme.theme")
         import("core.project.depend")
-        import("private.utils.progress")
+        import("core.tool.toolchain")
+        import("utils.progress")
 
         -- get xcode sdk directory
         local xcode_sdkdir = assert(get_config("xcode"), "xcode not found!")
@@ -45,7 +45,7 @@ rule("xcode.storyboard")
 
         -- need re-compile it?
         local dependfile = target:dependfile(sourcefile)
-        local dependinfo = option.get("rebuild") and {} or (depend.load(dependfile) or {})
+        local dependinfo = target:is_rebuilt() and {} or (depend.load(dependfile) or {})
         if not depend.is_changed(dependinfo, {lastmtime = os.mtime(dependfile)}) then
             return
         end
@@ -55,16 +55,27 @@ rule("xcode.storyboard")
 
         -- clear Base.lproj first
         os.tryrm(base_lproj)
+        os.mkdir(base_lproj)
 
         -- do compile
-        local target_minver
+        local target_minver = nil
+        local toolchain_xcode = toolchain.load("xcode", {plat = target:plat(), arch = target:arch()})
+        if toolchain_xcode then
+            target_minver = toolchain_xcode:config("target_minver")
+        end
         local argv = {"--errors", "--warnings", "--notices", "--auto-activate-custom-fonts", "--output-format", "human-readable-text"}
-        if is_plat("macosx") then
-            target_minver = get_config("target_minver_macosx")
-            table.insert(argv, "--target-device")
-            table.insert(argv, "mac")
-        elseif is_plat("iphoneos") then
-            target_minver = get_config("target_minver_iphoneos")
+        if target:is_plat("macosx") then
+            local xcode = target:toolchain("xcode")
+            if xcode and xcode:config("appledev") == "catalyst" then
+                table.insert(argv, "--platform")
+                table.insert(argv, "macosx")
+                table.insert(argv, "--target-device")
+                table.insert(argv, "ipad")
+            else
+                table.insert(argv, "--target-device")
+                table.insert(argv, "mac")
+            end
+        elseif target:is_plat("iphoneos") then
             table.insert(argv, "--target-device")
             table.insert(argv, "iphone")
             table.insert(argv, "--target-device")
@@ -83,7 +94,7 @@ rule("xcode.storyboard")
 
         -- do link
         argv = {"--errors", "--warnings", "--notices", "--auto-activate-custom-fonts", "--output-format", "human-readable-text"}
-        if is_plat("macosx") then
+        if target:is_plat("macosx") then
             table.insert(argv, "--target-device")
             table.insert(argv, "mac")
         end

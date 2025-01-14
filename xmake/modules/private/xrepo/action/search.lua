@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        search.lua
@@ -60,20 +60,17 @@ function _search_packages(packages)
     if not os.isdir(workdir) then
         os.mkdir(workdir)
         os.cd(workdir)
-        os.vrunv("xmake", {"create", "-P", "."})
+        os.vrunv(os.programfile(), {"create", "-P", "."})
     else
         os.cd(workdir)
     end
 
     -- do configure first
     local config_argv = {"f", "-c"}
-    if option.get("verbose") then
-        table.insert(config_argv, "-v")
-    end
     if option.get("diagnosis") then
-        table.insert(config_argv, "-D")
+        table.insert(config_argv, "-vD")
     end
-    os.vrunv("xmake", config_argv)
+    os.vrunv(os.programfile(), config_argv)
 
     -- do search
     local require_argv = {"require", "--search"}
@@ -84,7 +81,7 @@ function _search_packages(packages)
         table.insert(require_argv, "-D")
     end
     table.join2(require_argv, packages)
-    os.vexecv("xmake", require_argv)
+    os.vexecv(os.programfile(), require_argv)
 end
 
 -- main entry

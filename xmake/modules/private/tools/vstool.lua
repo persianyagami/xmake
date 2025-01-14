@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        vstool.lua
@@ -24,6 +24,12 @@ function runv(program, argv, opt)
     -- init options
     opt = opt or {}
 
+    -- if has VS_BINARY_OUTPUT dont enable unicode output
+    local envs = opt.envs or {}
+    if envs.VS_BINARY_OUTPUT then
+        return os.runv(program, argv, opt)
+    end
+
     -- make temporary output and error file
     local outpath = os.tmpfile()
     local errpath = os.tmpfile()
@@ -31,7 +37,9 @@ function runv(program, argv, opt)
 
     -- enable unicode output for vs toolchains, e.g. cl.exe, link.exe and etc.
     -- @see https://github.com/xmake-io/xmake/issues/528
-    opt.envs = table.join(opt.envs or {}, {VS_UNICODE_OUTPUT = outfile:rawfd()})
+    if is_host("windows") then
+        opt.envs = table.join(envs, {VS_UNICODE_OUTPUT = outfile:rawfd()})
+    end
 
     -- execute it
     local ok, syserrors = os.execv(program, argv, table.join(opt, {try = true, stdout = outfile, stderr = errpath}))
@@ -86,6 +94,12 @@ function iorunv(program, argv, opt)
     -- init options
     opt = opt or {}
 
+    -- if has VS_BINARY_OUTPUT dont enable unicode output
+    local envs = opt.envs or {}
+    if envs.VS_BINARY_OUTPUT then
+        return os.runv(program, argv, opt)
+    end
+
     -- make temporary output and error file
     local outpath = os.tmpfile()
     local errpath = os.tmpfile()
@@ -93,7 +107,9 @@ function iorunv(program, argv, opt)
 
     -- enable unicode output for vs toolchains, e.g. cl.exe, link.exe and etc.
     -- @see https://github.com/xmake-io/xmake/issues/528
-    opt.envs = table.join(opt.envs or {}, {VS_UNICODE_OUTPUT = outfile:rawfd()})
+    if is_host("windows") then
+        opt.envs = table.join(envs, {VS_UNICODE_OUTPUT = outfile:rawfd()})
+    end
 
     -- run command
     local ok, syserrors = os.execv(program, argv, table.join(opt, {try = true, stdout = outfile, stderr = errpath}))
@@ -136,8 +152,6 @@ function iorunv(program, argv, opt)
         -- raise errors
         os.raise({errors = errors, stderr = errdata, stdout = outdata})
     end
-
-    -- ok?
     return outdata, errdata
 end
 

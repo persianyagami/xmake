@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        coroutine.lua
@@ -31,8 +31,6 @@ coroutine._resume  = coroutine._resume or coroutine.resume
 
 -- resume coroutine
 function coroutine.resume(co, ...)
-
-    -- resume it
     local ok, results = coroutine._resume(co, ...)
     if not ok then
 
@@ -47,12 +45,8 @@ function coroutine.resume(co, ...)
                 errors = results:sub(pos + 1)
             end
         end
-
-        -- failed
         return false, errors
     end
-
-    -- ok
     return true, results
 end
 

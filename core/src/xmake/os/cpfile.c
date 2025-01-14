@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        cpfile.c
@@ -43,7 +43,17 @@ tb_int_t xm_os_cpfile(lua_State* lua)
     tb_char_t const* dst = luaL_checkstring(lua, 2);
     tb_check_return_val(src && dst, 0);
 
+    // init copy flags
+    tb_size_t flags = TB_FILE_COPY_NONE;
+    tb_bool_t is_symlink = lua_toboolean(lua, 3);
+    if (is_symlink)
+        flags |= TB_FILE_COPY_LINK;
+
+    tb_bool_t is_writeable = lua_toboolean(lua, 4);
+    if (is_writeable)
+        flags |= TB_FILE_COPY_WRITEABLE;
+
     // do copy
-    lua_pushboolean(lua, tb_file_copy(src, dst));
+    lua_pushboolean(lua, tb_file_copy(src, dst, flags));
     return 1;
 }

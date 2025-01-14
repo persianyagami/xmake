@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        irpairs.lua
@@ -60,7 +60,7 @@ function sandbox_irpairs(t, filter, ...)
 
     -- return iterator and initialized state
     t = table.wrap(t)
-    return iter, t, table.maxn(t) + 1
+    return iter, t, table.getn(t) + 1
 end
 
 -- load module

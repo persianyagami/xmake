@@ -12,46 +12,27 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define language
 language("msrc")
-
-    -- set source file kinds
-    set_sourcekinds {mrc = ".rc"}
-
-    -- set source file flags
+    add_rules("win.sdk.resource")
+    set_sourcekinds {mrc = {".rc", ".rc2"}}
     set_sourceflags {mrc = "mrcflags"}
-
-    -- set language kinds
-    set_langkinds {msrc = "mrc"}
-
-    -- set mixing kinds
+    set_langkinds   {msrc = "mrc"}
     set_mixingkinds("mrc")
 
-    -- add rules
-    add_rules("win.sdk.resource")
-
-    -- on load
     on_load("load")
 
-    -- set name flags
-    set_nameflags
-    {
-        object =
-        {
+    set_nameflags {
+        object = {
             "config.includedirs"
         ,   "target.defines"
         ,   "target.undefines"
         ,   "target.includedirs"
-        ,   "option.defines"
-        ,   "option.undefines"
-        ,   "option.defines_if_ok"
-        ,   "option.undefines_if_ok"
         ,   "toolchain.includedirs"
         ,   "toolchain.defines"
         ,   "toolchain.undefines"
@@ -60,7 +41,6 @@ language("msrc")
         }
     }
 
-    -- set menu
     set_menu {
                 config =
                 {

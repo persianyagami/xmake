@@ -12,24 +12,28 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define toolchain
+-- msvc toolchain
+--
+-- @param vs    the vs version
+--
+-- @code
+-- target("test")
+--     ...
+--     set_toolchains("msvc")
+--     set_toolchains("msvc", {vs = "2019"})
+-- @endcode
+--
 toolchain("msvc")
-
-    -- set homepage
+    set_kind("standalone")
     set_homepage("https://visualstudio.microsoft.com")
     set_description("Microsoft Visual C/C++ Compiler")
+    set_runtimes("MT", "MTd", "MD", "MDd")
 
-    -- mark as standalone toolchain
-    set_kind("standalone")
-
-    -- check toolchain
     on_check("check")
-
-    -- load toolchain
     on_load("load")

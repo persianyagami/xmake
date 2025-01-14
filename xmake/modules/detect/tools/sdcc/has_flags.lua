@@ -12,14 +12,14 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        has_flags.lua
 --
 
 -- imports
-import("lib.detect.cache")
+import("core.cache.detectcache")
 import("core.language.language")
 
 -- is linker?
@@ -41,7 +41,7 @@ function _try_running(...)
 
     local argv = {...}
     local errors = nil
-    return try { function () os.runv(unpack(argv)); return true end, catch { function (errs) errors = (errs or ""):trim() end }}, errors
+    return try { function () os.runv(table.unpack(argv)); return true end, catch { function (errs) errors = (errs or ""):trim() end }}, errors
 end
 
 -- attempt to check it from the argument list
@@ -58,11 +58,8 @@ function _check_from_arglist(flags, opt, islinker)
     -- make flags key
     local flagskey = opt.program .. "_" .. (opt.programver or "")
 
-    -- load cache
-    local cacheinfo  = cache.load(key)
-
     -- get all flags from argument list
-    local allflags = cacheinfo[flagskey]
+    local allflags = detectcache:get2(key, flagskey)
     if not allflags then
 
         -- get argument list
@@ -75,11 +72,9 @@ function _check_from_arglist(flags, opt, islinker)
         end
 
         -- save cache
-        cacheinfo[flagskey] = allflags
-        cache.save(key, cacheinfo)
+        detectcache:set2(key, flagskey, allflags)
+        detectcache:save()
     end
-
-    -- ok?
     return allflags[flags[1]]
 end
 
@@ -87,13 +82,13 @@ end
 function _check_try_running(flags, opt, islinker)
 
     -- get extension
-    -- @note we need detect extension for ndk/clang++.exe: warning: treating 'c' input as 'c++' when in C++ mode, this behavior is deprecated [-Wdeprecated]
+    -- @note we need to detect extension for ndk/clang++.exe: warning: treating 'c' input as 'c++' when in C++ mode, this behavior is deprecated [-Wdeprecated]
     local extension = opt.program:endswith("++") and ".cpp" or (table.wrap(language.sourcekinds()[opt.toolkind or "cc"])[1] or ".c")
 
     -- make an stub source file
     local sourcefile = path.join(os.tmpdir(), "detect", "sdcc_has_flags" .. extension)
     if not os.isfile(sourcefile) then
-        io.writefile(sourcefile, "int main(int argc, char** argv)\n{return 0;}")
+        io.writefile(sourcefile, "int main(int argc, char** argv)\n{return 0;}\n")
     end
 
     -- check flags for linker

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        install_package.lua
@@ -26,7 +26,7 @@ import("lib.detect.find_tool")
 -- install package
 --
 -- @param name  the package name, e.g. dub::log
--- @param opt   the options, e.g. { verbose = true, mode = "release", plat = , arch = , require_version = "x.x.x", buildhash = "xxxxxx"}
+-- @param opt   the options, e.g. { verbose = true, mode = "release", plat = , arch = , require_version = "x.x.x"}
 --
 -- @return      true or false
 --

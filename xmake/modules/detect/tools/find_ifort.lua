@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_ifort.lua
@@ -36,7 +36,6 @@ import("lib.detect.find_programver")
 -- @endcode
 --
 function main(opt)
-
     opt = opt or {}
     if is_host("windows") then
         -- find program

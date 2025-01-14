@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      OpportunityLiu
 -- @file        find_cudadevices.lua
@@ -22,7 +22,7 @@
 import("core.base.option")
 import("core.platform.platform")
 import("core.project.config")
-import("lib.detect.cache")
+import("core.cache.detectcache")
 import("lib.detect.find_tool")
 
 -- a magic string to filter output
@@ -113,7 +113,7 @@ function _parse_result(lines, verbose)
 end
 
 -- find devices
-function _find_devices(verbose)
+function _find_devices(verbose, opt)
 
     -- find nvcc
     local nvcc = assert(find_tool("nvcc"), "nvcc not found")
@@ -131,7 +131,12 @@ function _find_devices(verbose)
     {
         function ()
             local args = { sourcefile, "-run", "-o", outfile , '-DPRINT_SUFFIX="' .. _PRINT_SUFFIX .. '"' }
-            return os.iorunv(nvcc.program, args)
+            if opt.arch == "x86" then
+                table.insert(args, "-m32")
+            elseif opt.arch == "x64" or opt.arch == "x86_64" then
+                table.insert(args, "-m64")
+            end
+            return os.iorunv(nvcc.program, args, {envs = opt.envs})
         end,
         catch
         {
@@ -181,13 +186,13 @@ function _get_devices(opt)
     end
 
     -- check cache
-    local cachedata = cache.load(cachekey)
+    local cachedata = detectcache:get(cachekey) or {}
     if cachedata.succeed and not opt.force then
         return cachedata.data
     end
 
     local verbose = opt.verbose or option.get("verbose") or option.get("diagnosis")
-    local devices = _find_devices(verbose)
+    local devices = _find_devices(verbose, opt)
     if devices then
         cachedata = { succeed = true, data = devices }
     else
@@ -196,7 +201,8 @@ function _get_devices(opt)
     end
 
     -- fill cache
-    cache.save(cachekey, cachedata)
+    detectcache:set(cachekey, cachedata)
+    detectcache:save()
     return devices
 end
 
@@ -239,6 +245,8 @@ function _order_by_flops(devices)
     ,   [72] =     64
     ,   [75] =     64
     ,   [80] =     64
+    ,   [86] =    128
+    ,   [87] =    128
     }
 
     for _, dev in ipairs(devices) do

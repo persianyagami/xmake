@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        theme.lua
@@ -115,10 +115,12 @@ function theme.load(name)
 
     -- find the theme script path
     local scriptpath = nil
-    for _, dir in ipairs(theme.directories()) do
-        scriptpath = path.join(dir, name, "xmake.lua")
-        if os.isfile(scriptpath) then
-            break
+    if name then
+        for _, dir in ipairs(theme.directories()) do
+            scriptpath = path.join(dir, name, "xmake.lua")
+            if os.isfile(scriptpath) then
+                break
+            end
         end
     end
 

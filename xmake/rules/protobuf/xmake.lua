@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -20,23 +20,36 @@
 
 -- define rule: protobuf.cpp
 rule("protobuf.cpp")
-
-    -- set extension
+    add_deps("c++")
     set_extensions(".proto")
-
-    -- build protobuf file
-    before_build_file(function (target, sourcefile_proto, opt)
-        import("proto")(target, "cxx", sourcefile_proto, opt)
+    after_load(function(target)
+        import("proto").load(target, "cxx")
     end)
+    -- generate build commands
+    before_buildcmd_file(function(target, batchcmds, sourcefile_proto, opt)
+        import("proto").buildcmd_pfiles(target, batchcmds, sourcefile_proto, opt, "cxx")
+    end)
+    on_buildcmd_file(function(target, batchcmds, sourcefile_proto, opt)
+        import("proto").buildcmd_cxfiles(target, batchcmds, sourcefile_proto, opt, "cxx")
+    end)
+    before_build_files(function (target, batchjobs, sourcebatch, opt)
+        import("proto").build_cxfiles(target, batchjobs, sourcebatch, opt, "cxx")
+    end, {batch = true})
 
 
 -- define rule: protobuf.c
 rule("protobuf.c")
-
-    -- set extension
+    add_deps("c++")
     set_extensions(".proto")
-
-    -- build protobuf file
-    before_build_file(function (target, sourcefile_proto, opt)
-        import("proto")(target, "cc", sourcefile_proto, opt)
+    after_load(function(target)
+        import("proto").load(target, "cc")
     end)
+    before_buildcmd_file(function(target, batchcmds, sourcefile_proto, opt)
+        import("proto").buildcmd_pfiles(target, batchcmds, sourcefile_proto, opt, "cc")
+    end)
+    on_buildcmd_file(function(target, batchcmds, sourcefile_proto, opt)
+        import("proto").buildcmd_cxfiles(target, batchcmds, sourcefile_proto, opt, "cc")
+    end)
+    before_build_files(function (target, batchjobs, sourcebatch, opt)
+        import("proto").build_cxfiles(target, batchjobs, sourcebatch, opt, "cc")
+    end, {batch = true})

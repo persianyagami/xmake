@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_windres.lua
@@ -21,8 +21,8 @@
 -- imports
 import("lib.detect.find_program")
 
--- check
-function _check(program)
+-- we cannot run `windres --version` to check it, because llvm-mingw/windres always return non-zero
+function _check(program, opt)
     local objectfile = os.tmpfile() .. ".o"
     local resourcefile  = os.tmpfile() .. ".rc"
     io.writefile(resourcefile, [[
@@ -45,7 +45,7 @@ BEGIN
 END
     ]])
 
-    os.runv(program, {"-i", resourcefile, "-o", objectfile})
+    os.runv(program, {"-i", resourcefile, "-o", objectfile}, {envs = opt.envs})
     os.rm(resourcefile)
     os.rm(objectfile)
 end
@@ -65,6 +65,8 @@ end
 --
 function main(opt)
     opt = opt or {}
-    opt.check = _check -- we cannot run `windres --version` to check it, because llvm-mingw/windres always return non-zero
+    opt.check = function (program)
+        _check(program, opt)
+    end
     return find_program(opt.program or "windres", opt)
 end

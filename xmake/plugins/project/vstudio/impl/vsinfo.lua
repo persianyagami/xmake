@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      OpportunityLiu
 -- @file        vsinfo.lua
@@ -84,6 +84,14 @@ local vsinfo =
     ,   solution_version    = "12"
     ,   toolset_version     = "v142"
     ,   sdk_version         = "10.0.17763.0"
+    }
+,   [2022] =
+    {   vstudio_version     = "2022"
+    ,   project_version     = "17"
+    ,   filters_version     = "4.0"
+    ,   solution_version    = "12"
+    ,   toolset_version     = "v143"
+    ,   sdk_version         = "10.0.19041.0"
     }
 }
 

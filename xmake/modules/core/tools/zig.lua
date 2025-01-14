@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        zig.lua
@@ -36,17 +36,16 @@ end
 
 -- make the strip flag
 function nf_strip(self, level)
-    local maps =
-    {
-        debug       = "--strip"
-    ,   all         = "--strip"
+    local maps = {
+        debug  = "-fstrip"
+    ,   all    = {"-fstrip", "-dead_strip"}
     }
     return maps[level]
 end
 
 -- make the define flag
 function nf_define(self, macro)
-    return "-D" .. macro
+    return {"-D" .. macro}
 end
 
 -- make the optimize flag
@@ -55,7 +54,6 @@ function nf_optimize(self, level)
     {
         none       = "-O Debug"
     ,   fast       = "-O ReleaseSafe"
-    ,   aggressive = "-O ReleaseFast"
     ,   fastest    = "-O ReleaseFast"
     ,   smallest   = "-O ReleaseSmall"
     ,   aggressive = "-O ReleaseFast"
@@ -75,29 +73,29 @@ end
 
 -- make the linkdir flag
 function nf_linkdir(self, dir)
-    return "-L" .. os.args(dir)
+    return {"-L", dir}
 end
 
 -- make the framework flag
 function nf_framework(self, framework)
-    return "-framework " .. framework
+    return {"-framework", framework}
 end
 
 -- make the frameworkdir flag
 function nf_frameworkdir(self, frameworkdir)
-    return "-F " .. os.args(path.translate(frameworkdir))
+    return {"-F", path.translate(frameworkdir)}
 end
 
 -- make the rpathdir flag
 function nf_rpathdir(self, dir)
     dir = path.translate(dir)
-    if is_plat("macosx") then
-        return "-rpath " .. os.args(dir:gsub("%$ORIGIN", "@loader_path"))
+    if self:is_plat("macosx") then
+        return {"-rpath", (dir:gsub("%$ORIGIN", "@loader_path"))}
     else
-        return "-rpath " .. os.args(dir:gsub("@[%w_]+", function (name)
+        return {"-rpath", (dir:gsub("@[%w_]+", function (name)
             local maps = {["@loader_path"] = "$ORIGIN", ["@executable_path"] = "$ORIGIN"}
             return maps[name]
-        end))
+        end))}
     end
 end
 
@@ -117,11 +115,7 @@ end
 
 -- link the target file
 function link(self, objectfiles, targetkind, targetfile, flags)
-
-    -- ensure the target directory
     os.mkdir(path.directory(targetfile))
-
-    -- link it
     os.runv(linkargv(self, objectfiles, targetkind, targetfile, flags))
 end
 
@@ -132,11 +126,7 @@ end
 
 -- compile the source file
 function compile(self, sourcefile, objectfile, dependinfo, flags)
-
-    -- ensure the object directory
     os.mkdir(path.directory(objectfile))
-
-    -- compile it
     os.runv(compargv(self, sourcefile, objectfile, flags))
 end
 

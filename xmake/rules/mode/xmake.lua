@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -20,7 +20,7 @@
 
 -- define rule: debug mode
 rule("mode.debug")
-    after_load(function (target)
+    on_config(function (target)
 
         -- is debug mode now? xmake f -m debug
         if is_mode("debug") then
@@ -34,24 +34,27 @@ rule("mode.debug")
             if not target:get("optimize") then
                 target:set("optimize", "none")
             end
+
+            -- #5777: '--device-debug (-G)' overrides '--generate-line-info (-lineinfo)' in nvcc
+            target:add("cuflags", "-G")
         end
     end)
 
 -- define rule: release mode
 rule("mode.release")
-    after_load(function (target)
+    on_config(function (target)
 
         -- is release mode now? xmake f -m release
         if is_mode("release") then
 
             -- set the symbols visibility: hidden
-            if not target:get("symbols") and target:targetkind() ~= "shared" then
+            if not target:get("symbols") and target:kind() ~= "shared" then
                 target:set("symbols", "hidden")
             end
 
             -- enable optimization
             if not target:get("optimize") then
-                if is_plat("android", "iphoneos") then
+                if target:is_plat("android", "iphoneos") then
                     target:set("optimize", "smallest")
                 else
                     target:set("optimize", "fastest")
@@ -62,12 +65,16 @@ rule("mode.release")
             if not target:get("strip") then
                 target:set("strip", "all")
             end
+
+            -- enable NDEBUG macros to disables standard-C assertions
+            target:add("cxflags", "-DNDEBUG")
+            target:add("cuflags", "-DNDEBUG")
         end
     end)
 
 -- define rule: release with debug symbols mode
 rule("mode.releasedbg")
-    after_load(function (target)
+    on_config(function (target)
 
         -- is releasedbg mode now? xmake f -m releasedbg
         if is_mode("releasedbg") then
@@ -79,7 +86,7 @@ rule("mode.releasedbg")
 
             -- enable optimization
             if not target:get("optimize") then
-                if is_plat("android", "iphoneos") then
+                if target:is_plat("android", "iphoneos") then
                     target:set("optimize", "smallest")
                 else
                     target:set("optimize", "fastest")
@@ -90,12 +97,19 @@ rule("mode.releasedbg")
             if not target:get("strip") then
                 target:set("strip", "all")
             end
+
+            -- enable NDEBUG macros to disables standard-C assertions
+            target:add("cxflags", "-DNDEBUG")
+            target:add("cuflags", "-DNDEBUG")
+
+            -- #5777: '--device-debug (-G)' overrides '--generate-line-info (-lineinfo)' in nvcc
+            target:add("cuflags", "-lineinfo")
         end
     end)
 
 -- define rule: release with minsize mode
 rule("mode.minsizerel")
-    after_load(function (target)
+    on_config(function (target)
 
         -- is minsizerel mode now? xmake f -m minsizerel
         if is_mode("minsizerel") then
@@ -114,12 +128,16 @@ rule("mode.minsizerel")
             if not target:get("strip") then
                 target:set("strip", "all")
             end
+
+            -- enable NDEBUG macros to disables standard-C assertions
+            target:add("cxflags", "-DNDEBUG")
+            target:add("cuflags", "-DNDEBUG")
         end
     end)
 
 -- define rule: profile mode
 rule("mode.profile")
-    after_load(function (target)
+    on_config(function (target)
 
         -- is profile mode now? xmake f -m profile
         if is_mode("profile") then
@@ -131,23 +149,35 @@ rule("mode.profile")
 
             -- enable optimization
             if not target:get("optimize") then
-                if is_plat("android", "iphoneos") then
+                if target:is_plat("android", "iphoneos") then
                     target:set("optimize", "smallest")
                 else
                     target:set("optimize", "fastest")
                 end
             end
 
-            -- enable gprof
-            target:add("cxflags", "-pg")
-            target:add("mxflags", "-pg")
-            target:add("ldflags", "-pg")
+            if target:is_plat("windows") then
+                -- enable vs profile
+                target:add("ldflags", "/profile")
+            else
+                -- enable gprof
+                target:add("cxflags", "-pg")
+                target:add("mxflags", "-pg")
+                target:add("ldflags", "-pg")
+            end
+
+            -- enable NDEBUG macros to disables standard-C assertions
+            target:add("cxflags", "-DNDEBUG")
+            target:add("cuflags", "-DNDEBUG")
+
+            -- #5777: '--device-debug (-G)' overrides '--generate-line-info (-lineinfo)' in nvcc
+            target:add("cuflags", "-lineinfo")
         end
     end)
 
 -- define rule: coverage mode
 rule("mode.coverage")
-    after_load(function (target)
+    on_config(function (target)
 
         -- is coverage mode now? xmake f -m coverage
         if is_mode("coverage") then
@@ -166,11 +196,14 @@ rule("mode.coverage")
             target:add("cxflags", "--coverage")
             target:add("mxflags", "--coverage")
             target:add("ldflags", "--coverage")
+            target:add("shflags", "--coverage")
         end
     end)
 
 -- define rule: asan mode
 rule("mode.asan")
+
+    -- we use after_load because c++.build.sanitizer rule/on_config need it
     after_load(function (target)
 
         -- is asan mode now? xmake f -m asan
@@ -183,7 +216,7 @@ rule("mode.asan")
 
             -- enable optimization
             if not target:get("optimize") then
-                if is_plat("android", "iphoneos") then
+                if target:is_plat("android", "iphoneos") then
                     target:set("optimize", "smallest")
                 else
                     target:set("optimize", "fastest")
@@ -191,10 +224,10 @@ rule("mode.asan")
             end
 
             -- enable asan checker
-            target:add("cxflags", "-fsanitize=address")
-            target:add("mxflags", "-fsanitize=address")
-            target:add("ldflags", "-fsanitize=address")
-            target:add("shflags", "-fsanitize=address")
+            target:set("policy", "build.sanitizer.address", true)
+
+            -- we should use "build.sanitizer.address" instead of it.
+            wprint("deprecated: please use set_policy(\"build.sanitizer.address\", true) instead of \"mode.asan\".")
         end
     end)
 
@@ -212,7 +245,7 @@ rule("mode.tsan")
 
             -- enable optimization
             if not target:get("optimize") then
-                if is_plat("android", "iphoneos") then
+                if target:is_plat("android", "iphoneos") then
                     target:set("optimize", "smallest")
                 else
                     target:set("optimize", "fastest")
@@ -220,10 +253,10 @@ rule("mode.tsan")
             end
 
             -- enable tsan checker
-            target:add("cxflags", "-fsanitize=thread")
-            target:add("mxflags", "-fsanitize=thread")
-            target:add("ldflags", "-fsanitize=thread")
-            target:add("shflags", "-fsanitize=thread")
+            target:set("policy", "build.sanitizer.thread", true)
+
+            -- we should use "build.sanitizer.thread" instead of it.
+            wprint("deprecated: please use set_policy(\"build.sanitizer.thread\", true) instead of \"mode.tsan\".")
         end
     end)
 
@@ -241,7 +274,7 @@ rule("mode.msan")
 
             -- enable optimization
             if not target:get("optimize") then
-                if is_plat("android", "iphoneos") then
+                if target:is_plat("android", "iphoneos") then
                     target:set("optimize", "smallest")
                 else
                     target:set("optimize", "fastest")
@@ -249,10 +282,10 @@ rule("mode.msan")
             end
 
             -- enable msan checker
-            target:add("cxflags", "-fsanitize=memory")
-            target:add("mxflags", "-fsanitize=memory")
-            target:add("ldflags", "-fsanitize=memory")
-            target:add("shflags", "-fsanitize=memory")
+            target:set("policy", "build.sanitizer.memory", true)
+
+            -- we should use "build.sanitizer.memory" instead of it.
+            wprint("deprecated: please use set_policy(\"build.sanitizer.memory\", true) instead of \"mode.msan\".")
         end
     end)
 
@@ -270,7 +303,7 @@ rule("mode.lsan")
 
             -- enable optimization
             if not target:get("optimize") then
-                if is_plat("android", "iphoneos") then
+                if target:is_plat("android", "iphoneos") then
                     target:set("optimize", "smallest")
                 else
                     target:set("optimize", "fastest")
@@ -278,10 +311,10 @@ rule("mode.lsan")
             end
 
             -- enable lsan checker
-            target:add("cxflags", "-fsanitize=leak")
-            target:add("mxflags", "-fsanitize=leak")
-            target:add("ldflags", "-fsanitize=leak")
-            target:add("shflags", "-fsanitize=leak")
+            target:set("policy", "build.sanitizer.leak", true)
+
+            -- we should use "build.sanitizer.leak" instead of it.
+            wprint("deprecated: please use set_policy(\"build.sanitizer.leak\", true) instead of \"mode.lsan\".")
         end
     end)
 
@@ -299,24 +332,24 @@ rule("mode.ubsan")
 
             -- enable optimization
             if not target:get("optimize") then
-                if is_plat("android", "iphoneos") then
+                if target:is_plat("android", "iphoneos") then
                     target:set("optimize", "smallest")
                 else
                     target:set("optimize", "fastest")
                 end
             end
 
-            -- enable tsan checker
-            target:add("cxflags", "-fsanitize=undefined")
-            target:add("mxflags", "-fsanitize=undefined")
-            target:add("ldflags", "-fsanitize=undefined")
-            target:add("shflags", "-fsanitize=undefined")
+            -- enable ubsan checker
+            target:set("policy", "build.sanitizer.undefined", true)
+
+            -- we should use "build.sanitizer.undefined" instead of it.
+            wprint("deprecated: please use set_policy(\"build.sanitizer.undefined\", true) instead of \"mode.ubsan\".")
         end
     end)
 
 -- define rule: valgrind mode
 rule("mode.valgrind")
-    after_load(function (target)
+    on_config(function (target)
 
         -- is valgrind mode now? xmake f -m valgrind
         if is_mode("valgrind") then
@@ -328,7 +361,7 @@ rule("mode.valgrind")
 
             -- enable optimization
             if not target:get("optimize") then
-                if is_plat("android", "iphoneos") then
+                if target:is_plat("android", "iphoneos") then
                     target:set("optimize", "smallest")
                 else
                     target:set("optimize", "fastest")
@@ -339,7 +372,7 @@ rule("mode.valgrind")
 
 -- define rule: check mode (deprecated)
 rule("mode.check")
-    after_load(function (target)
+    on_config(function (target)
 
         -- is check mode now? xmake f -m check
         if is_mode("check") then

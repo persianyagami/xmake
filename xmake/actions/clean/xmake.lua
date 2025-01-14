@@ -12,33 +12,21 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define task
 task("clean")
-
-    -- set category
     set_category("action")
-
-    -- on run
     on_run("main")
 
-    -- set menu
     set_menu {
-                -- usage
                 usage = "xmake clean|c [options] [target]"
-
-                -- description
             ,   description = "Remove all binary and temporary files."
-
-                -- xmake c
             ,   shortname = 'c'
 
-                -- options
             ,   options =
                 {
                     {'a', "all",        "k",  nil   , "Clean all auto-generated files by xmake."                      }

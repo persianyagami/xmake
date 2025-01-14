@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_cmake.lua
@@ -47,9 +47,10 @@ function main(opt)
     -- find program
     local program = find_program(opt.program or "cmake", opt)
     if not program and is_host("windows") then
-        local msvc = toolchain.load("msvc")
+        -- we always use host/arch to avoid windows/arm64, because we are building packages for cross-compilation
+        local msvc = toolchain.load("msvc", {plat = os.host(), arch = os.arch()})
         if msvc:check() then
-            opt.envs = toolchain.load("msvc"):runenvs() -- we attempt to find it from vstudio environments
+            opt.envs = msvc:runenvs() -- we attempt to find it from vstudio environments
             opt.force = true
             program = find_program(opt.program or "cmake", opt)
         end

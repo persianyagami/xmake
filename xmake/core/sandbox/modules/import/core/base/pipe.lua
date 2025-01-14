@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        pipe.lua
@@ -78,8 +78,8 @@ function sandbox_core_base_pipe_instance.write(pipefile, data, opt)
 end
 
 -- read data from pipe file
-function sandbox_core_base_pipe_instance.read(pipefile, size, opt)
-    local real, data_or_errors = pipefile:_read(size, opt)
+function sandbox_core_base_pipe_instance.read(pipefile, buff, size, opt)
+    local real, data_or_errors = pipefile:_read(buff, size, opt)
     if real < 0 and data_or_errors then
         raise(data_or_errors)
     end
@@ -104,8 +104,8 @@ function sandbox_core_base_pipe.open(name, mode, buffsize)
 end
 
 -- open a anonymous pipe pair
-function sandbox_core_base_pipe.openpair(buffsize)
-    local rpipefile, wpipefile, errors = pipe.openpair(buffsize)
+function sandbox_core_base_pipe.openpair(mode, buffsize)
+    local rpipefile, wpipefile, errors = pipe.openpair(mode, buffsize)
     if not rpipefile or not wpipefile then
         raise(errors)
     end
