@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        extension.lua
@@ -23,15 +23,18 @@ import("core.base.hashset")
 
 -- get the archive extension
 function main(archivefile)
-
     local extension = ""
     local filename = path.filename(archivefile)
-    local extensionset = hashset.from({".zip", ".7z", ".gz", ".xz", ".tgz", ".bz2", ".tar", ".tar.gz", ".tar.xz", ".tar.bz2"})
+    local extensionset = hashset.from({
+        ".xmz", -- xmake compression format
+        ".zip", ".7z", ".gz", ".xz", ".zst", ".tgz",
+        ".bz2", ".tar", ".tar.gz", ".tar.xz",
+        ".tar.zst", ".tar.bz2", ".tar.Z"})
     local i = filename:lastof(".", true)
     if i then
         local p = filename:sub(1, i - 1):lastof(".", true)
         if p and extensionset:has(filename:sub(p)) then i = p end
         extension = filename:sub(i)
     end
-    return extension
+    return extensionset:has(extension) and extension or ""
 end

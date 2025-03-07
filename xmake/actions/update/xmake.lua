@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -40,7 +40,8 @@ task("update")
                 {
                     {nil, "uninstall",   "k",   nil,    "Uninstall the current xmake program."                     }
                 ,   {                                                                                              }
-                ,   {'s', "scriptonly",  "k",   nil,    "Update script only"                                       }
+                ,   {'s', "scriptonly",  "k",   nil,    "Update scripts only."                                     }
+                ,   {nil, "integrate",   "k",   nil,    "Integrate xmake with default shell."                  }
                 ,   {'f', "force",       "k",   nil,    "Force to update and reinstall the given version."         }
                 ,   {nil, "xmakever",    "v",   nil,    "The given xmake version, or a git source (and branch). ",
                                                         "e.g.",

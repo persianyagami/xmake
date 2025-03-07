@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        ld.lua
@@ -31,7 +31,7 @@ function init(self)
     self:set("shflags", "-shared")
 
     -- add -fPIC for shared
-    if not is_plat("windows", "mingw") then
+    if not self:is_plat("windows", "mingw") then
         self:add("shflags", "-fPIC")
         self:add("shared.cxflags", "-fPIC")
     end
@@ -39,14 +39,11 @@ end
 
 -- make the strip flag
 function nf_strip(self, level)
-    local maps =
-    {
+    local maps = {
         debug = "-S"
     ,   all   = "-s"
     }
-
-    local plat = config.plat()
-    if plat == "macosx" or plat == "iphoneos" then
+    if self:is_plat("macosx", "iphoneos") then
         maps.all   = "-Wl,-x"
         maps.debug = "-Wl,-S"
     end
@@ -65,28 +62,22 @@ end
 
 -- make the linkdir flag
 function nf_linkdir(self, dir)
-    return "-L" .. os.args(path.translate(dir))
+    return {"-L", path.translate(dir)}
 end
 
 -- make the link arguments list
 function linkargv(self, objectfiles, targetkind, targetfile, flags, opt)
-
-    -- init arguments
     opt = opt or {}
     local argv = table.join("-o", targetfile, objectfiles, flags)
     if is_host("windows") and not opt.rawargs then
-        argv = winos.cmdargv(argv)
+        argv = winos.cmdargv(argv, {escape = true})
     end
     return self:program(), argv
 end
 
 -- link the target file
 function link(self, objectfiles, targetkind, targetfile, flags)
-
-    -- ensure the target directory
     os.mkdir(path.directory(targetfile))
-
-    -- link it
     os.runv(linkargv(self, objectfiles, targetkind, targetfile, flags))
 end
 

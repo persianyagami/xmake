@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        update.lua
@@ -30,21 +30,33 @@ import("lib.detect.find_tool")
 --
 -- import("devel.git.submodule")
 --
--- submodule.update("master", {repodir = "/tmp/xmake", init = true, remote = true})
--- submodule.update("v1.0.1", {repodir = "/tmp/xmake", recursive = true, reference = "xxx", paths = "xxx"})
+-- submodule.update({repodir = "/tmp/xmake", init = true, remote = true})
+-- submodule.update({repodir = "/tmp/xmake", recursive = true, longpaths = true, reference = "xxx", paths = "xxx"})
 --
 -- @endcode
 --
 function main(opt)
-
-    -- init options
     opt = opt or {}
-
-    -- find git
     local git = assert(find_tool("git"), "git not found!")
 
     -- init argv
-    local argv = {"submodule", "update"}
+    local argv = {}
+    if opt.fsmonitor then
+        table.insert(argv, "-c")
+        table.insert(argv, "core.fsmonitor=true")
+    else
+        table.insert(argv, "-c")
+        table.insert(argv, "core.fsmonitor=false")
+    end
+
+    -- use longpaths, we need it on windows
+    if opt.longpaths then
+        table.insert(argv, "-c")
+        table.insert(argv, "core.longpaths=true")
+    end
+
+    table.insert(argv, "submodule")
+    table.insert(argv, "update")
     for _, name in ipairs({"init", "remote", "force", "checkout", "merge", "rebase", "recursive"}) do
         if opt[name] then
             table.insert(argv, "--" .. name)
@@ -58,17 +70,6 @@ function main(opt)
         table.join2(argv, opt.paths)
     end
 
-    -- enter repository directory
-    local oldir = nil
-    if opt.repodir then
-        oldir = os.cd(opt.repodir)
-    end
-
-    -- submodule it
-    os.vrunv(git.program, argv)
-
-    -- leave repository directory
-    if oldir then
-        os.cd(oldir)
-    end
+    -- update it
+    os.vrunv(git.program, argv, {curdir = opt.repodir})
 end

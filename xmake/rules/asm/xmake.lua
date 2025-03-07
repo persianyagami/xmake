@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -38,3 +38,10 @@ rule("asm")
     -- we attempt to extract symbols to the independent file and
     -- strip self-target binary if `set_symbols("debug")` and `set_strip("all")` are enabled
     add_deps("utils.symbols.extract")
+
+    -- add platform rules
+    add_deps("platform.windows")
+
+    -- add linker rules
+    add_deps("linker")
+

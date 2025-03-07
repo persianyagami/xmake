@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        load.lua
@@ -47,7 +47,7 @@ function umdf(target)
     -- get arch
     local arch = config.arch()
 
-    -- add defines
+    -- add definitions
     local umdfver = wdk.umdfver:split('%.')
     if arch == "x64" then
         target:add("defines", "_WIN64", "_AMD64_", "AMD64")
@@ -78,7 +78,7 @@ function kmdf(target)
     -- get arch
     local arch = config.arch()
 
-    -- add defines
+    -- add definitions
     local winver  = target:values("wdk.env.winver") or config.get("wdk_winver")
     local kmdfver = wdk.kmdfver:split('%.')
     if arch == "x64" then
@@ -117,7 +117,7 @@ function wdm(target)
     -- get arch
     local arch = config.arch()
 
-    -- add defines
+    -- add definitions
     local winver  = target:values("wdk.env.winver") or config.get("wdk_winver")
     local kmdfver = wdk.kmdfver:split('%.')
     if arch == "x64" then

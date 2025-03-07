@@ -12,44 +12,25 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define language
 language("asm")
-
-    -- set source file kinds
+    add_rules("asm")
     set_sourcekinds {as = {".s", ".asm"}}
-
-    -- set source file flags
     set_sourceflags {as = "asflags"}
-
-    -- set target kinds
     set_targetkinds {binary = "ld", static = "ar", shared = "sh"}
-
-    -- set target flags
     set_targetflags {binary = "ldflags", static = "arflags", shared = "shflags"}
-
-    -- set language kinds
-    set_langkinds {as = "as"}
-
-    -- set mixing kinds
+    set_langkinds   {as = "as"}
     set_mixingkinds("as")
 
-    -- add rules
-    add_rules("asm")
-
-    -- on load
     on_load("load")
 
-    -- set name flags
-    set_nameflags
-    {
-        object =
-        {
+    set_nameflags {
+        object = {
             "config.includedirs"
         ,   "target.symbols"
         ,   "target.warnings"
@@ -59,68 +40,49 @@ language("asm")
         ,   "target.includedirs"
         ,   "target.defines"
         ,   "target.undefines"
-        ,   "option.symbols"
-        ,   "option.warnings"
-        ,   "option.optimize:check"
-        ,   "option.vectorexts:check"
-        ,   "option.languages"
-        ,   "option.includedirs"
-        ,   "option.defines"
-        ,   "option.undefines"
-        ,   "option.defines_if_ok"
-        ,   "option.undefines_if_ok"
+        ,   "target.runtimes"
         ,   "toolchain.includedirs"
         ,   "toolchain.defines"
         ,   "toolchain.undefines"
         ,   "target.sysincludedirs"
-        ,   "option.sysincludedirs"
         ,   "toolchain.sysincludedirs"
         }
-    ,   binary =
-        {
+    ,   binary = {
             "config.linkdirs"
         ,   "target.linkdirs"
         ,   "target.rpathdirs"
         ,   "target.strip"
         ,   "target.symbols"
-        ,   "option.strip"
-        ,   "option.symbols"
-        ,   "option.linkdirs"
-        ,   "option.rpathdirs"
+        ,   "target.runtimes"
         ,   "toolchain.linkdirs"
         ,   "toolchain.rpathdirs"
         ,   "config.links"
         ,   "target.links"
-        ,   "option.links"
         ,   "toolchain.links"
+        ,   "config.syslinks"
+        ,   "target.syslinks"
+        ,   "toolchain.syslinks"
         }
-    ,   shared =
-        {
+    ,   shared = {
             "config.linkdirs"
         ,   "target.linkdirs"
         ,   "target.strip"
         ,   "target.symbols"
-        ,   "option.strip"
-        ,   "option.symbols"
-        ,   "option.linkdirs"
+        ,   "target.runtimes"
         ,   "toolchain.linkdirs"
         ,   "config.links"
         ,   "target.links"
-        ,   "option.links"
         ,   "toolchain.links"
         ,   "config.syslinks"
         ,   "target.syslinks"
-        ,   "option.syslinks"
         ,   "toolchain.syslinks"
         }
-    ,   static =
-        {
+    ,   static = {
             "target.strip"
         ,   "target.symbols"
         }
     }
 
-    -- set menu
     set_menu {
                 config =
                 {

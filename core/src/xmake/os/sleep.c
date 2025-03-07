@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        sleep.c
@@ -35,15 +35,8 @@
  */
 tb_int_t xm_os_sleep(lua_State* lua)
 {
-    // check
     tb_assert_and_check_return_val(lua, 0);
-
-    // get the interval (ms)
     tb_long_t interval = (tb_long_t)luaL_checklong(lua, 1);
-
-    // sleep it
     if (interval >= 0) tb_msleep(interval);
-
-    // ok
     return 0;
 }

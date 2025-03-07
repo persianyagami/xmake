@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        android.lua
@@ -24,7 +24,9 @@ import("core.base.option")
 import("core.base.semver")
 import("core.project.config")
 import("core.project.depend")
-import("private.utils.progress")
+import("core.tool.toolchain")
+import("lib.detect.find_file")
+import("utils.progress")
 
 -- escape path
 function _escape_path(p)
@@ -34,13 +36,16 @@ end
 -- deploy application package for android
 function main(target, opt)
 
+    -- get ndk toolchain
+    local toolchain_ndk = toolchain.load("ndk", {plat = target:plat(), arch = target:arch()})
+
     -- get target apk path
     local target_apk = path.join(target:targetdir(), target:basename() .. ".apk")
 
     -- need re-generate this apk?
     local targetfile = target:targetfile()
     local dependfile = target:dependfile(target_apk)
-    local dependinfo = option.get("rebuild") and {} or (depend.load(dependfile) or {})
+    local dependinfo = target:is_rebuilt() and {} or (depend.load(dependfile) or {})
     if not depend.is_changed(dependinfo, {lastmtime = os.mtime(dependfile)}) then
         return
     end
@@ -52,8 +57,8 @@ function main(target, opt)
     local qt = target:data("qt")
 
     -- get ndk
-    local ndk = path.translate(assert(config.get("ndk"), "cannot get NDK!"))
-    local ndk_sdkver = assert(config.get("ndk_sdkver"), "cannot get the sdk version of NDK!")
+    local ndk = path.translate(assert(toolchain_ndk:config("ndk"), "cannot get NDK!"))
+    local ndk_sdkver = assert(toolchain_ndk:config("ndk_sdkver"), "cannot get the sdk version of NDK!")
 
     -- get ndk host
     local ndk_host = os.host() .. "-" .. os.arch()
@@ -66,7 +71,10 @@ function main(target, opt)
     end
 
     -- get androiddeployqt
-    local androiddeployqt = path.join(qt.bindir, "androiddeployqt" .. (is_host("windows") and ".exe" or ""))
+    local search_dirs = {}
+    if qt.bindir_host then table.insert(search_dirs, qt.bindir_host) end
+    if qt.bindir then table.insert(search_dirs, qt.bindir) end
+    local androiddeployqt = find_file("androiddeployqt" .. (is_host("windows") and ".exe" or ""), search_dirs)
     assert(os.isexec(androiddeployqt), "androiddeployqt not found!")
 
     -- get working directory
@@ -82,10 +90,10 @@ function main(target, opt)
     local java_home = assert(os.getenv("JAVA_HOME"), "please set $JAVA_HOME environment variable first!")
 
     -- get android sdk directory
-    local android_sdkdir = path.translate(assert(config.get("android_sdk"), "please run `xmake f --android_sdk=xxx` to set the android sdk directory!"))
+    local android_sdkdir = path.translate(assert(toolchain_ndk:config("android_sdk"), "please run `xmake f --android_sdk=xxx` to set the android sdk directory!"))
 
     -- get android build-tools version
-    local android_build_toolver = assert(config.get("build_toolver"), "please run `xmake f --build_toolver=xxx` to set the android build-tools version!")
+    local android_build_toolver = assert(toolchain_ndk:config("build_toolver"), "please run `xmake f --build_toolver=xxx` to set the android build-tools version!")
 
     -- get qt sdk version
     local qt_sdkver = config.get("qt_sdkver")
@@ -110,33 +118,21 @@ function main(target, opt)
 
     -- install target to android-build/libs first
     if qt_sdkver and qt_sdkver:ge("5.14") then
-        -- we need copy target to android-build/libs/armeabi/libxxx_armeabi.so after Qt 5.14.0
+        -- we need to copy target to android-build/libs/armeabi/libxxx_armeabi.so after Qt 5.14.0
         os.cp(target:targetfile(), path.join(android_buildir, "libs", target_arch, "lib" .. target:basename() .. "_" .. target_arch .. ".so"))
     else
         os.cp(target:targetfile(), path.join(android_buildir, "libs", target_arch, path.filename(target:targetfile())))
     end
 
-    -- get the android srcs directory, e.g. android-build/java/res/values
-    local android_srcs
-    if qt_sdkver and qt_sdkver:ge("5.14") then
-        -- @note we need patch values/res/strings.xml for Qt 5.14.0
-        local valuesdir = path.join(android_buildir, "java", "res", "values")
-        if not os.isdir(valuesdir) then
-            os.mkdir(valuesdir)
-        end
-        os.cp(path.join(qt.sdkdir, "src", "android", "java", "res", "values", "*"), valuesdir)
-        android_srcs = path.join(android_buildir, "java")
-    end
-
     -- get stdcpp path
     local stdcpp_path = path.join(ndk, "sources/cxx-stl/llvm-libc++/libs", target_arch, "libc++_shared.so")
     if qt_sdkver and qt_sdkver:ge("5.14") then
-        local toolchain = path.directory(assert(config.get("bin"), "toolchain/bin directory not found!"))
-        stdcpp_path = path.join(toolchain, "sysroot", "usr", "lib")
+        local ndk_sysroot = assert(toolchain_ndk:config("ndk_sysroot"), "NDK sysroot directory not found!")
+        stdcpp_path = path.join(ndk_sysroot, "usr", "lib")
     end
 
     -- get toolchain version
-    local ndk_toolchains_ver = config.get("ndk_toolchains_ver") or "4.9"
+    local ndk_toolchains_ver = toolchain_ndk:config("ndk_toolchains_ver") or "4.9"
 
     -- generate android-deployment-settings.json file
     local android_deployment_settings = path.join(workdir, "android-deployment-settings.json")
@@ -155,9 +151,34 @@ function main(target, opt)
         settings_file:print('   "ndk-host": "%s",', ndk_host)
         settings_file:print('   "target-architecture": "%s",', target_arch)
         settings_file:print('   "qml-root-path": "%s",', _escape_path(os.projectdir()))
-        if android_srcs then
-            settings_file:print('   "android-package-source-directory": "%s",', _escape_path(android_srcs))
-            --settings_file:print('   "android-extra-libs":"c:/libs",')
+        -- for 6.2.x
+        local search_dirs = {}
+        if qt.libexecdir_host then table.insert(search_dirs, qt.libexecdir_host) end
+        if qt.libexecdir then table.insert(search_dirs, qt.libexecdir) end
+        local qmlimportscanner = find_file("qmlimportscanner" .. (is_host("windows") and ".exe" or ""), search_dirs)
+        if os.isexec(qmlimportscanner) then
+            settings_file:print('   "qml-importscanner-binary": "%s",', _escape_path(qmlimportscanner))
+        end
+        -- for 6.3.x
+        local search_dirs = {}
+        if qt.bindir_host then table.insert(search_dirs, qt.bindir_host) end
+        if qt.bindir then table.insert(search_dirs, qt.bindir) end
+        local rcc = find_file("rcc" .. (is_host("windows") and ".exe" or ""), search_dirs)
+        if os.isexec(rcc) then
+            settings_file:print('   "rcc-binary": "%s",', _escape_path(rcc))
+        end
+        local platformplugin = find_file("libplugins_platforms_qtforandroid_" .. target_arch .. "*", path.join(qt.sdkdir, "plugins", "platforms"))
+        if platformplugin then
+            settings_file:print('   "deployment-dependencies": {"%s":"%s"},', target_arch, _escape_path(platformplugin))
+        end
+
+        local minsdkversion = target:values("qt.android.minsdkversion")
+        if minsdkversion then
+            settings_file:print('    "android-min-sdk-version": "%s",', tostring(minsdkversion))
+        end
+        local targetsdkversion = target:values("qt.android.targetsdkversion")
+        if targetsdkversion then
+            settings_file:print('    "android-target-sdk-version": "%s",', tostring(targetsdkversion))
         end
         settings_file:print('   "useLLVM": true,')
         if qt_sdkver and qt_sdkver:ge("5.14") then
@@ -190,12 +211,18 @@ function main(target, opt)
     -- do deploy
     local argv = {"--input", android_deployment_settings,
                   "--output", android_buildir,
-                  "--android-platform", android_platform,
                   "--jdk", java_home,
                   "--gradle", "--no-gdbserver"}
     if option.get("verbose") and option.get("diagnosis") then
         table.insert(argv, "--verbose")
     end
+
+    -- add user flags
+    local user_flags = target:values("qt.deploy.flags") or {}
+    if user_flags then
+        argv = table.join(argv, user_flags)
+    end
+
     os.vrunv(androiddeployqt, argv)
 
     -- output apk

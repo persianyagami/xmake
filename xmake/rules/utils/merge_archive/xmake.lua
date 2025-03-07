@@ -12,64 +12,63 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define rule: utils.merge.archive
 rule("utils.merge.archive")
-
-    -- set extensions
     set_extensions(".a", ".lib")
-
-    -- on build file
-    on_build_files(function (target, sourcebatch, opt)
-
-        -- imports
-        import("core.base.option")
-        import("core.theme.theme")
-        import("core.project.depend")
-        import("core.tool.extractor")
-        import("core.project.target", {alias = "project_target"})
-        import("private.utils.progress")
-
-        -- @note we cannot process archives in parallel because the current directory may be changed
-        for i = 1, #sourcebatch.sourcefiles do
-
-            -- get library source file
-            local sourcefile_lib = sourcebatch.sourcefiles[i]
-
-            -- get object directory of the archive file
-            local objectdir = target:objectfile(sourcefile_lib) .. ".dir"
-
-            -- load dependent info
-            local dependfile = target:dependfile(objectdir)
-            local dependinfo = option.get("rebuild") and {} or (depend.load(dependfile) or {})
-
-            -- need build this object?
-            if not depend.is_changed(dependinfo, {lastmtime = os.mtime(objectdir)}) then
-                local objectfiles = os.files(path.join(objectdir, "**" .. project_target.filename("", "object")))
-                table.join2(target:objectfiles(), objectfiles)
-                return
+    after_load(function (target)
+        -- we need to disable inherit links if all static deps have been merged
+        -- and we must disable it in after_load, because it will be called before rule(utils.inherit.links).on_config
+        --
+        -- @see https://github.com/xmake-io/xmake/issues/3404
+        if target:policy("build.merge_archive") then
+            for _, dep in ipairs(target:orderdeps()) do
+                if dep:is_static() then
+                    dep:data_set("inherit.links.deplink", false)
+                end
             end
-
-            -- trace progress info
-            progress.show(opt.progress, "${color.build.object}inserting.$(mode) %s", sourcefile_lib)
-
-            -- extract the archive library
-            os.tryrm(objectdir)
-            extractor.extract(sourcefile_lib, objectdir)
-
-            -- add objectfiles
-            local objectfiles = os.files(path.join(objectdir, "**" .. project_target.filename("", "object")))
-            table.join2(target:objectfiles(), objectfiles)
-
-            -- update files to the dependent file
-            dependinfo.files = {}
-            table.insert(dependinfo.files, sourcefile_lib)
-            depend.save(dependinfo, dependfile)
+        end
+    end)
+    on_build_files(function (target, sourcebatch, opt)
+        if sourcebatch.sourcefiles then
+            target:data_set("merge_archive.sourcefiles", sourcebatch.sourcefiles)
+        end
+    end)
+    after_link(function (target, opt)
+        if not target:is_static() then
+            return
+        end
+        local sourcefiles = target:data("merge_archive.sourcefiles")
+        if target:policy("build.merge_archive") or sourcefiles then
+            import("utils.archive.merge_staticlib")
+            import("core.project.depend")
+            import("utils.progress")
+            local libraryfiles = {}
+            if sourcefiles then
+                table.join2(libraryfiles, sourcefiles)
+            else
+                for _, dep in ipairs(target:orderdeps()) do
+                    if dep:is_static() then
+                        table.insert(libraryfiles, dep:targetfile())
+                    end
+                end
+            end
+            if #libraryfiles > 0 then
+                table.insert(libraryfiles, target:targetfile())
+            end
+            depend.on_changed(function ()
+                progress.show(opt.progress, "${color.build.target}merging.$(mode) %s", path.filename(target:targetfile()))
+                if #libraryfiles > 0 then
+                    local tmpfile = os.tmpfile() .. path.extension(target:targetfile())
+                    merge_staticlib(target, tmpfile, libraryfiles)
+                    os.cp(tmpfile, target:targetfile())
+                    os.rm(tmpfile)
+                end
+            end, {dependfile = target:dependfile(target:targetfile() .. ".merge_archive"), files = libraryfiles, changed = target:is_rebuilt()})
         end
     end)
 

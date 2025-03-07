@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -26,7 +26,6 @@ function _show_list(name)
     assert(#name > 0 and import("lists." .. name, {try = true, anonymous = true}), "unknown list name(%s)", name)()
 end
 
--- main entry
 function main()
 
     -- show list?

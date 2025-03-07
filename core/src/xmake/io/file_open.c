@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      OpportunityLiu, ruki
  * @file        file_open.c
@@ -207,6 +207,14 @@ tb_int_t xm_io_file_open(lua_State* lua)
         encoding = TB_CHARSET_TYPE_UTF16 | TB_CHARSET_TYPE_BE;
     else if (tb_strstr(modestr, "utf16") || tb_strstr(modestr, "utf-16"))
         encoding = TB_CHARSET_TYPE_UTF16 | TB_CHARSET_TYPE_NE;
+    else if (tb_strstr(modestr, "ansi"))
+        encoding = TB_CHARSET_TYPE_ANSI;
+    else if (tb_strstr(modestr, "gbk"))
+        encoding = TB_CHARSET_TYPE_GBK;
+    else if (tb_strstr(modestr, "gb2312"))
+        encoding = TB_CHARSET_TYPE_GB2312;
+    else if (tb_strstr(modestr, "iso8859"))
+        encoding = TB_CHARSET_TYPE_ISO8859;
     else if (modestr[0] == 'w' || modestr[0] == 'a') // set to utf-8 if not specified for the writing mode
         encoding = TB_CHARSET_TYPE_UTF8;
     else if (modestr[0] == 'r') // detect encoding if not specified for the reading mode
@@ -222,6 +230,11 @@ tb_int_t xm_io_file_open(lua_State* lua)
     }
     else xm_io_return_error(lua, "invalid open mode!");
     tb_assert_and_check_return_val(encoding != XM_IO_FILE_ENCODING_UNKNOWN, 0);
+
+    // write data with utf bom? e.g. utf8bom, utf16lebom, utf16bom
+    tb_bool_t utfbom = tb_false;
+    if (tb_strstr(modestr, "bom"))
+        utfbom = tb_true;
 
     // open file
     tb_bool_t       open_ok = tb_false;
@@ -279,12 +292,13 @@ tb_int_t xm_io_file_open(lua_State* lua)
     tb_assert_and_check_return_val(file, 0);
 
     // init file
-    file->file_ref   = file_ref;
+    file->u.file_ref = file_ref;
     file->stream     = stream;
     file->fstream    = fstream;
     file->mode       = mode;
     file->type       = XM_IO_FILE_TYPE_FILE;
     file->encoding   = encoding;
+    file->utfbom     = utfbom;
 
     // init the read/write line cache buffer
     tb_buffer_init(&file->rcache);

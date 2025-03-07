@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        prefix.h
@@ -32,9 +32,15 @@
 #   define LUA_API extern "C"
 #   define LUALIB_API	LUA_API
 #endif
-#include "luajit.h"
-#include "lualib.h"
-#include "lauxlib.h"
+#ifdef USE_LUAJIT
+#   include "luajit.h"
+#   include "lualib.h"
+#   include "lauxlib.h"
+#else
+#   include "lua.h"
+#   include "lualib.h"
+#   include "lauxlib.h"
+#endif
 
 /* //////////////////////////////////////////////////////////////////////////////////////
  * private interfaces
@@ -107,6 +113,38 @@ static __tb_inline__ tb_pointer_t xm_lua_topointer(lua_State* lua, tb_int_t idx)
     return lua_touserdata(lua, idx);
 }
 #endif
+
+static __tb_inline__ tb_void_t xm_lua_register(lua_State *lua, tb_char_t const* libname, luaL_Reg const* l)
+{
+#if LUA_VERSION_NUM >= 504
+    if (libname)
+    {
+        lua_getglobal(lua, libname);
+        if (lua_isnil(lua, -1))
+        {
+            lua_pop(lua, 1);
+            lua_newtable(lua);
+        }
+        luaL_setfuncs(lua, l, 0);
+        lua_setglobal(lua, libname);
+    }
+    else
+    {
+        luaL_setfuncs(lua, l, 0);
+    }
+#else
+    luaL_register(lua, libname, l);
+#endif
+}
+
+static __tb_inline__ tb_int_t xm_lua_isinteger(lua_State* lua, int idx)
+{
+#ifdef USE_LUAJIT
+    return lua_isnumber(lua, idx);
+#else
+    return lua_isinteger(lua, idx);
+#endif
+}
 
 #endif
 

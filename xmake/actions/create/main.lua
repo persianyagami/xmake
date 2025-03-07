@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -31,6 +31,9 @@ end
 
 -- create project from template
 function _create_project(language, templateid, targetname)
+
+    -- check the targetname
+    assert(targetname ~= ".", "you should specify ${red}-P${reset} instead of directly using ${red}.${reset}")
 
     -- check the language
     assert(language, "no language!")
@@ -76,13 +79,13 @@ function _create_project(language, templateid, targetname)
     end
 
     -- xmake.lua exists?
-    if os.isfile(path.join(projectdir, "xmake.lua")) then
+    if os.isfile(path.join(projectdir, "xmake.lua")) and not option.get("force") then
         raise("project (${underline}%s/xmake.lua${reset}) exists!", projectdir)
     end
 
     -- empty project?
     os.tryrm(path.join(projectdir, ".xmake"))
-    if not os.emptydir(projectdir) then
+    if not os.emptydir(projectdir) and not option.get("force") then
         -- otherwise, check whether it is empty
         raise("project directory (${underline}%s${reset}) is not empty!", projectdir)
     end
@@ -95,7 +98,8 @@ function _create_project(language, templateid, targetname)
     local sourcedir = path.join(tempinst:scriptdir(), "project")
     if os.isdir(sourcedir) then
         for _, filedir in ipairs(os.filedirs(path.join(sourcedir, "*"))) do
-            os.cp(filedir, projectdir)
+            -- https://github.com/xmake-io/xmake/issues/5138#issuecomment-2329238617
+            os.cp(filedir, projectdir, {writeable = true})
             table.insert(filedirs, path.relative(filedir, sourcedir))
         end
         os.cp(path.join(os.programdir(), "scripts", "gitignore"), path.join(projectdir, ".gitignore"))

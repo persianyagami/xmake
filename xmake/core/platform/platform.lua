@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        platform.lua
@@ -27,19 +27,38 @@ local os             = require("base/os")
 local path           = require("base/path")
 local utils          = require("base/utils")
 local table          = require("base/table")
+local global         = require("base/global")
 local interpreter    = require("base/interpreter")
 local toolchain      = require("tool/toolchain")
+local memcache       = require("cache/memcache")
 local sandbox        = require("sandbox/sandbox")
 local config         = require("project/config")
-local global         = require("base/global")
+local scheduler      = require("sandbox/modules/import/core/base/scheduler")
 
 -- new an instance
-function _instance.new(name, arch, info)
+function _instance.new(name, info, opt)
+    opt = opt or{}
     local instance    = table.inherit(_instance)
     instance._NAME    = name
-    instance._ARCH    = arch
     instance._INFO    = info
+    instance._ARCH    = opt.arch
+    instance._IS_HOST = opt.host or false
     return instance
+end
+
+-- get memcache
+function _instance:_memcache()
+    local cache = self._MEMCACHE
+    if not cache then
+        cache = memcache.cache("core.platform.platform." .. tostring(self))
+        self._MEMCACHE = cache
+    end
+    return cache
+end
+
+-- the toolchains cache key for names
+function _instance:_toolchains_key()
+    return "__toolchains_" .. self:name() .. "_" .. self:arch() .. (self:is_host() and "_host" or "")
 end
 
 -- get platform name
@@ -50,6 +69,21 @@ end
 -- get platform architecture
 function _instance:arch()
     return self._ARCH or config.get("arch")
+end
+
+-- set platform architecture
+function _instance:arch_set(arch)
+    if self:arch() ~= arch then
+        -- we need to clean the dirty cache if architecture has been changed
+        platform._PLATFORMS[self:name() .. "_" .. self:arch()] = nil
+        platform._PLATFORMS[self:name() .. "_" .. arch] = self
+        self._ARCH = arch
+    end
+end
+
+-- is host platform, it will use the host toolchain
+function _instance:is_host()
+    return self._IS_HOST
 end
 
 -- set the value to the platform configuration
@@ -89,7 +123,7 @@ end
 
 -- get the platform os
 function _instance:os()
-    return self._INFO:get("os") or config.get("target_os")
+    return self._INFO:get("os")
 end
 
 -- get the platform menu
@@ -128,20 +162,21 @@ end
 
 -- get the toolchains
 function _instance:toolchains(opt)
-    local toolchains = self._TOOLCHAINS
+    local toolchains = self:_memcache():get("toolchains")
     if not toolchains then
 
         -- get current valid toolchains from configuration cache
         local names = nil
         toolchains = {}
         if not (opt and opt.all) then
-            names = config.get("__toolchains_" .. self:name() .. "_" .. self:arch())
+            names = config.get(self:_toolchains_key())
         end
         if not names then
             -- get the given toolchain
-            local toolchain_given = config.get("toolchain")
+            local toolchain_given = config.get(self:is_host() and "toolchain_host" or "toolchain")
             if toolchain_given then
-                local toolchain_inst, errors = toolchain.load(toolchain_given, {plat = self:name(), arch = self:arch()})
+                local toolchain_inst, errors = toolchain.load(toolchain_given, {
+                    plat = self:name(), arch = self:arch()})
                 -- attempt to load toolchain from project
                 if not toolchain_inst and platform._project() then
                     toolchain_inst = platform._project().toolchain(toolchain_given)
@@ -154,13 +189,14 @@ function _instance:toolchains(opt)
             end
 
             -- get the platform toolchains
-            if (not toolchain_given or not toolchain_given:standalone()) and self._INFO:get("toolchains") then
+            if (not toolchain_given or not toolchain_given:is_standalone()) and self._INFO:get("toolchains") then
                 names = self._INFO:get("toolchains")
             end
         end
         if names then
             for _, name in ipairs(table.wrap(names)) do
-                local toolchain_inst, errors = toolchain.load(name, {plat = self:name(), arch = self:arch()})
+                local toolchain_inst, errors = toolchain.load(name, {
+                    plat = self:name(), arch = self:arch()})
                 -- attempt to load toolchain from project
                 if not toolchain_inst and platform._project() then
                     toolchain_inst = platform._project().toolchain(name)
@@ -168,77 +204,28 @@ function _instance:toolchains(opt)
                 if not toolchain_inst then
                     os.raise(errors)
                 end
-                table.insert(toolchains, toolchain_inst)
+                -- ignore cross toolchains for the host platform:w
+                if (self:is_host() and not toolchain_inst:is_cross()) or not self:is_host() then
+                    table.insert(toolchains, toolchain_inst)
+                end
             end
         end
-        self._TOOLCHAINS = toolchains
+        self:_memcache():set("toolchains", toolchains)
     end
     return toolchains
 end
 
 -- get the program and name of the given tool kind
 function _instance:tool(toolkind)
-
-    -- init tools
-    local tools = self._TOOLS
-    if not tools then
-        tools = {}
-        self._TOOLS = tools
-    end
-
-    -- get tool program
-    local program, toolname, toolchain_info
-    local toolinfo = tools[toolkind]
-    if toolinfo == nil then
-        toolinfo = {}
-        local toolchains = self:toolchains()
-        for idx, toolchain_inst in ipairs(toolchains) do
-            program, toolname = toolchain_inst:tool(toolkind)
-            if program then
-                toolchain_info = {name = toolchain_inst:name(), plat = toolchain_inst:plat(), arch = toolchain_inst:arch()}
-                toolinfo[1] = program
-                toolinfo[2] = toolname
-                toolinfo[3] = toolchain_info
-                break
-            end
-        end
-        tools[toolkind] = toolinfo
-    else
-        program        = toolinfo[1]
-        toolname       = toolinfo[2]
-        toolchain_info = toolinfo[3]
-    end
-    return program, toolname, toolchain_info
+    return toolchain.tool(self:toolchains(), toolkind, {cachekey = "platform", plat = self:name(), arch = self:arch(),
+                          before_get = function ()
+        return config.get(toolkind)
+    end})
 end
 
 -- get tool configuration from the toolchains
 function _instance:toolconfig(name)
-
-    -- init tool configs
-    local toolconfigs = self._TOOLCONFIGS
-    if not toolconfigs then
-        toolconfigs = {}
-        self._TOOLCONFIGS = toolconfigs
-    end
-
-    -- get configuration
-    local toolconfig = toolconfigs[name]
-    if toolconfig == nil then
-
-        -- get them from all toolchains
-        for _, toolchain_inst in ipairs(self:toolchains()) do
-            local values = toolchain_inst:get(name)
-            if values then
-                toolconfig = toolconfig or {}
-                table.join2(toolconfig, values)
-            end
-        end
-
-        -- cache it
-        toolconfig = toolconfig or false
-        toolconfigs[name] = toolconfig
-    end
-    return toolconfig or nil
+    return toolchain.toolconfig(self:toolchains(), name, {cachekey = "platform", plat = self:name(), arch = self:arch()})
 end
 
 -- get the platform script
@@ -265,14 +252,16 @@ end
 
 -- do check
 function _instance:check()
+    -- @see https://github.com/xmake-io/xmake/issues/4645#issuecomment-2201036943
+    -- @note avoid check it in the same time leading to deadlock if running in the coroutine
+    local lockname = tostring(self)
+    scheduler.co_lock(lockname)
 
-    -- check platform
-    local on_check = self:script("check")
-    if on_check then
-        local ok, errors = sandbox.load(on_check, self)
-        if not ok then
-            return false, errors
-        end
+    -- this platform has been check?
+    local checked = self:_memcache():get("checked")
+    if checked ~= nil then
+        scheduler.co_unlock(lockname)
+        return checked
     end
 
     -- check toolchains
@@ -283,12 +272,12 @@ function _instance:check()
     local toolchains_valid = {}
     while idx <= num do
         local toolchain = toolchains[idx]
-        -- we need remove other standalone toolchains if standalone toolchain found
-        if (standalone and toolchain:standalone()) or not toolchain:check() then
+        -- we need to remove other standalone toolchains if standalone toolchain found
+        if (standalone and toolchain:is_standalone()) or not toolchain:check() then
             table.remove(toolchains, idx)
             num = num - 1
         else
-            if toolchain:standalone() then
+            if toolchain:is_standalone() then
                 standalone = true
             end
             idx = idx + 1
@@ -296,11 +285,15 @@ function _instance:check()
         end
     end
     if #toolchains == 0 then
+        self:_memcache():set("checked", false)
+        scheduler.co_unlock(lockname)
         return false, "toolchains not found!"
     end
 
     -- save valid toolchains
-    config.set("__toolchains_" .. self:name() .. "_" .. self:arch(), toolchains_valid)
+    config.set(self:_toolchains_key(), toolchains_valid)
+    self:_memcache():set("checked", true)
+    scheduler.co_unlock(lockname)
     return true
 end
 
@@ -309,7 +302,8 @@ function _instance:formats()
     local formats = self._FORMATS
     if not formats then
         for _, toolchain_inst in ipairs(self:toolchains()) do
-            formats = toolchain_inst:get("formats")
+            -- @note we can only get formats from set_formats in toolchain description.
+            formats = toolchain_inst:get("formats", {load = false})
             if formats then
                 break
             end
@@ -383,7 +377,6 @@ function platform._apis()
         {
             -- platform.on_xxx
             "platform.on_load"
-        ,   "platform.on_check"
         }
     ,   keyvalues =
         {
@@ -397,41 +390,40 @@ function platform._apis()
     }
 end
 
+-- get memcache
+function platform._memcache()
+    return memcache.cache("core.platform.platform")
+end
+
 -- get platform directories
 function platform.directories()
-
-    -- init directories
     local dirs = platform._DIRS or  {   path.join(global.directory(), "platforms")
                                     ,   path.join(os.programdir(), "platforms")
                                     }
-
-    -- save directories to cache
     platform._DIRS = dirs
     return dirs
 end
 
 -- add platform directories
 function platform.add_directories(...)
-
-    -- add directories
     local dirs = platform.directories()
     for _, dir in ipairs({...}) do
         table.insert(dirs, 1, dir)
     end
-
-    -- remove unique directories
     platform._DIRS = table.unique(dirs)
 end
 
 -- load the given platform
-function platform.load(plat, arch)
-
-    -- get platform name
+function platform.load(plat, arch, opt)
+    opt = opt or {}
     plat = plat or config.get("plat") or os.host()
     arch = arch or config.get("arch") or os.arch()
 
     -- get cache key
     local cachekey = plat .. "_" .. arch
+    if opt.host then
+        cachekey = cachekey .. "_host"
+    end
 
     -- get it directly from cache dirst
     platform._PLATFORMS = platform._PLATFORMS or {}
@@ -442,8 +434,6 @@ function platform.load(plat, arch)
     -- find the platform script path
     local scriptpath = nil
     for _, dir in ipairs(platform.directories()) do
-
-        -- find this directory
         scriptpath = path.join(dir, plat, "xmake.lua")
         if os.isfile(scriptpath) then
             break
@@ -486,14 +476,14 @@ function platform.load(plat, arch)
     end
 
     -- save instance to the cache
-    local instance = _instance.new(plat, arch, result)
+    local instance = _instance.new(plat, result, {arch = arch, host = opt.host})
     platform._PLATFORMS[cachekey] = instance
     return instance
 end
 
 -- get the given platform configuration
-function platform.get(name, plat, arch)
-    local instance, errors = platform.load(plat, arch)
+function platform.get(name, plat, arch, opt)
+    local instance, errors = platform.load(plat, arch, opt)
     if instance then
         return instance:get(name)
     else
@@ -505,47 +495,18 @@ end
 --
 -- e.g. cc, cxx, mm, mxx, as, ar, ld, sh, ..
 --
-function platform.tool(toolkind, plat, arch)
-
-    -- attempt to get program from config first
-    plat = plat or config.get("plat") or os.host()
-    arch = arch or config.get("arch") or os.arch()
-    local key = toolkind .. "_" .. plat .. "_" .. arch
-    local program = config.get(toolkind) or config.get("__tool_" .. key)
-    local toolname = config.get("__toolname_" .. key)
-    local toolchain_info = config.get("__toolchain_info_" .. key)
-    if program == nil then
-
-        -- get the current platform
-        local instance, errors = platform.load(plat, arch)
-        if not instance then
-            os.raise(errors)
-        end
-
-        -- get it from the platform toolchains
-        program, toolname, toolchain_info = instance:tool(toolkind)
-        if program then
-            config.set("__tool_" .. key, program, {force = true, readonly = true})
-            config.set("__toolname_" .. key, toolname)
-            config.set("__toolchain_info_" .. key, toolchain_info)
-            config.save()
-        end
+function platform.tool(toolkind, plat, arch, opt)
+    local instance, errors = platform.load(plat, arch, opt)
+    if instance then
+        return instance:tool(toolkind)
+    else
+        os.raise(errors)
     end
-
-    -- contain toolname? parse it, e.g. 'gcc@xxxx.exe'
-    if program and type(program) == "string" then
-        local pos = program:find('@', 1, true)
-        if pos then
-            toolname = program:sub(1, pos - 1)
-            program = program:sub(pos + 1)
-        end
-    end
-    return program, toolname, toolchain_info
 end
 
 -- get the given tool configuration
-function platform.toolconfig(name, plat, arch)
-    local instance, errors = platform.load(plat, arch)
+function platform.toolconfig(name, plat, arch, opt)
+    local instance, errors = platform.load(plat, arch, opt)
     if instance then
         return instance:toolconfig(name)
     else
@@ -580,26 +541,22 @@ end
 
 -- get the all toolchains
 function platform.toolchains()
-
-    -- return it directly if exists
-    if platform._TOOLCHAINS then
-        return platform._TOOLCHAINS
-    end
-
-    -- get all toolchains
-    local toolchains = {}
-    local dirs  = toolchain.directories()
-    for _, dir in ipairs(dirs) do
-        local dirs = os.dirs(path.join(dir, "*"))
-        if dirs then
-            for _, dir in ipairs(dirs) do
-                if os.isfile(path.join(dir, "xmake.lua")) then
-                    table.insert(toolchains, path.basename(dir))
+    local toolchains = platform._memcache():get("toolchains")
+    if not toolchains then
+        toolchains = {}
+        local dirs  = toolchain.directories()
+        for _, dir in ipairs(dirs) do
+            local dirs = os.dirs(path.join(dir, "*"))
+            if dirs then
+                for _, dir in ipairs(dirs) do
+                    if os.isfile(path.join(dir, "xmake.lua")) then
+                        table.insert(toolchains, path.filename(dir))
+                    end
                 end
             end
         end
+        platform._memcache():set("toolchains", toolchains)
     end
-    platform._TOOLCHAINS = toolchains
     return toolchains
 end
 
@@ -613,8 +570,8 @@ function platform.archs(plat, arch)
     return platform.get("archs", plat, arch)
 end
 
--- get the format of the given target kind for platform
-function platform.format(targetkind, plat, arch)
+-- get the format of the given kind for platform
+function platform.format(kind, plat, arch)
 
     -- get platform instance
     local instance, errors = platform.load(plat, arch)
@@ -625,7 +582,7 @@ function platform.format(targetkind, plat, arch)
     -- get formats
     local formats = instance:formats()
     if formats then
-        return formats[targetkind]
+        return formats[kind]
     end
 end
 

@@ -12,43 +12,57 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
 -- define toolchain
-toolchain("clang")
-
-    -- set homepage
-    set_homepage("https://clang.llvm.org/")
-    set_description("A C language family frontend for LLVM")
-
-    -- mark as standalone toolchain
+function toolchain_clang(version)
+local suffix = ""
+if version then
+    suffix = suffix .. "-" .. version
+end
+toolchain("clang" .. suffix)
     set_kind("standalone")
+    set_homepage("https://clang.llvm.org/")
+    set_description("A C language family frontend for LLVM" .. (version and (" (" .. version .. ")") or ""))
+    set_runtimes("c++_static", "c++_shared", "stdc++_static", "stdc++_shared")
 
-    -- set toolset
-    set_toolset("cc", "clang")
-    set_toolset("cxx", "clang", "clang++")
-    set_toolset("ld", "clang++", "clang")
-    set_toolset("sh", "clang++", "clang")
-    set_toolset("ar", "ar")
-    set_toolset("ex", "ar")
-    set_toolset("strip", "strip")
-    set_toolset("mm", "clang")
-    set_toolset("mxx", "clang", "clang++")
-    set_toolset("as", "clang")
+    set_toolset("cc", "clang" .. suffix)
+    set_toolset("cxx", "clang" .. suffix, "clang++" .. suffix)
+    set_toolset("ld", "clang++" .. suffix, "clang" .. suffix)
+    set_toolset("sh", "clang++" .. suffix, "clang" .. suffix)
+    set_toolset("ar", "ar", "llvm-ar")
+    set_toolset("strip", "strip", "llvm-strip")
+    set_toolset("ranlib", "ranlib", "llvm-ranlib")
+    set_toolset("objcopy", "objcopy", "llvm-objcopy")
+    set_toolset("mm", "clang" .. suffix)
+    set_toolset("mxx", "clang" .. suffix, "clang++" .. suffix)
+    set_toolset("as", "clang" .. suffix)
+    set_toolset("mrc", "llvm-rc")
 
-    -- check toolchain
     on_check(function (toolchain)
-        return import("lib.detect.find_tool")("clang")
+        if toolchain:is_plat("windows") then
+            local rootdir = path.join(path.directory(os.scriptdir()), "clang")
+            local result = import("check", {rootdir = rootdir})(toolchain, suffix)
+            if result then
+                return result
+            end
+        end
+
+        return import("lib.detect.find_tool")("clang" .. suffix)
     end)
 
-    -- on load
     on_load(function (toolchain)
+        import("core.project.project")
 
-        -- add march flags
+        if project.policy("build.optimization.lto") then
+            toolchain:set("toolset", "ar",  "llvm-ar" .. suffix)
+            toolchain:set("toolset", "ranlib",  "llvm-ranlib" .. suffix)
+        end
+
         local march
         if toolchain:is_arch("x86_64", "x64") then
             march = "-m64"
@@ -62,4 +76,13 @@ toolchain("clang")
             toolchain:add("ldflags", march)
             toolchain:add("shflags", march)
         end
+        if toolchain:is_plat("windows") then
+            toolchain:add("runtimes", "MT", "MTd", "MD", "MDd")
+        end
+        if toolchain:is_plat("windows", "mingw") then
+            local rootdir = path.join(path.directory(os.scriptdir()), "clang")
+            import("load", {rootdir = rootdir})(toolchain, suffix)
+        end
     end)
+end
+toolchain_clang()

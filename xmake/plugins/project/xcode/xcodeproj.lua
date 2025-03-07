@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xcodeproj.lua
@@ -22,7 +22,7 @@
 import(".cmake.cmakelists")
 import("lib.detect.find_tool")
 
--- TODO maybe we need implement it by myself, do not use cmake
+-- TODO maybe we need to implement it by myself, do not use cmake
 function make(outputdir)
 
     -- check

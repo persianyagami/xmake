@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -28,6 +28,7 @@ local sandbox_xmake = sandbox_xmake or {}
 sandbox_xmake.version     = xmake.version
 sandbox_xmake.programdir  = xmake.programdir
 sandbox_xmake.programfile = xmake.programfile
+sandbox_xmake.luajit      = xmake.luajit
 
 -- return module
 return sandbox_xmake

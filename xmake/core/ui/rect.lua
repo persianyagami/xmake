@@ -13,16 +13,11 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        rect.lua
 --
-
---[[ Console User Interface (cui) ]-----------------------------------------
-Author: Tiago Dionizio (tiago.dionizio AT gmail.com)
-$Id: rect.lua 18 2007-06-21 20:43:52Z tngd $
---------------------------------------------------------------------------]]
 
 -- load modules
 local point  = require("ui/point")

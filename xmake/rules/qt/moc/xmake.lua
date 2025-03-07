@@ -12,43 +12,29 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define rule: moc
 rule("qt.moc")
-
-    -- add rule: qt environment
     add_deps("qt.env")
-
-    -- set extensions
+    add_deps("qt.ui", {order = true})
     set_extensions(".h", ".hpp")
-
-    -- before load
-    before_load(function (target)
+    before_buildcmd_file(function (target, batchcmds, sourcefile, opt)
+        import("core.tool.compiler")
+        import("lib.detect.find_file")
 
         -- get moc
-        local moc = path.join(target:data("qt").bindir, is_host("windows") and "moc.exe" or "moc")
+        local qt = assert(target:data("qt"), "Qt not found!")
+        local search_dirs = {}
+        if qt.bindir_host then table.insert(search_dirs, qt.bindir_host) end
+        if qt.bindir then table.insert(search_dirs, qt.bindir) end
+        if qt.libexecdir_host then table.insert(search_dirs, qt.libexecdir_host) end
+        if qt.libexecdir then table.insert(search_dirs, qt.libexecdir) end
+        local moc = find_file(is_host("windows") and "moc.exe" or "moc", search_dirs)
         assert(moc and os.isexec(moc), "moc not found!")
-
-        -- save moc
-        target:data_set("qt.moc", moc)
-    end)
-
-    -- before build file (we need compile it first if exists Q_PRIVATE_SLOT)
-    before_build_file(function (target, sourcefile, opt)
-
-        -- imports
-        import("moc")
-        import("core.base.option")
-        import("core.theme.theme")
-        import("core.project.config")
-        import("core.tool.compiler")
-        import("core.project.depend")
-        import("private.utils.progress")
 
         -- get c++ source file for moc
         --
@@ -60,38 +46,54 @@ rule("qt.moc")
         if sourcefile:endswith(".cpp") then
             filename_moc = basename .. ".moc"
         end
-        local sourcefile_moc = path.join(target:autogendir(), "rules", "qt", "moc", filename_moc)
-
-        -- get object file
-        local objectfile = target:objectfile(sourcefile_moc)
-
-        -- load compiler
-        local compinst = compiler.load("cxx", {target = target})
-
-        -- get compile flags
-        local compflags = compinst:compflags({target = target, sourcefile = sourcefile_moc})
+        -- we need to retain the file directory structure, @see https://github.com/xmake-io/xmake/issues/2343
+        local sourcefile_moc = target:autogenfile(path.join(path.directory(sourcefile), filename_moc))
 
         -- add objectfile
+        local objectfile = target:objectfile(sourcefile_moc)
         table.insert(target:objectfiles(), objectfile)
 
-        -- load dependent info
-        local dependfile = target:dependfile(objectfile)
-        local dependinfo = option.get("rebuild") and {} or (depend.load(dependfile) or {})
+        -- add commands
+        batchcmds:show_progress(opt.progress, "${color.build.object}compiling.qt.moc %s", sourcefile)
 
-        -- need build this object?
-        local depvalues = {compinst:program(), compflags}
-        if not depend.is_changed(dependinfo, {lastmtime = os.mtime(objectfile), values = depvalues}) then
-            return
+        -- get values from target
+        -- @see https://github.com/xmake-io/xmake/issues/3930
+        local function _get_values_from_target(target, name)
+            local values = {}
+            for _, value in ipairs((target:get_from(name, "*"))) do
+                table.join2(values, value)
+            end
+            return table.unique(values)
         end
 
-        -- trace progress info
-        progress.show(opt.progress, "${color.build.object}compiling.qt.moc %s", sourcefile)
-
         -- generate c++ source file for moc
-        moc.generate(target, sourcefile, sourcefile_moc)
+        local flags = {}
+        table.join2(flags, compiler.map_flags("cxx", "define", _get_values_from_target(target, "defines")))
+        local pathmaps = {
+            {"includedirs", "includedir"},
+            {"sysincludedirs", "includedir"}, -- for now, moc process doesn't support MSVC external includes flags and will fail
+            {"frameworkdirs", "frameworkdir"}
+        }
+        for _, pathmap in ipairs(pathmaps) do
+            for _, item in ipairs(_get_values_from_target(target, pathmap[1])) do
+                local pathitem = path(item, function (p)
+                    local item = table.unwrap(compiler.map_flags("cxx", pathmap[2], p))
+                    if item then
+                        -- we always need use '/' to fix it for project generator, because it will use path.translate in cl.lua
+                        item = item:gsub("\\", "/")
+                    end
+                    return item
+                end)
+                if not pathitem:empty() then
+                    table.insert(flags, pathitem)
+                end
+            end
+        end
+        local user_flags = target:get("qt.moc.flags") or {}
+        batchcmds:mkdir(path.directory(sourcefile_moc))
+        batchcmds:vrunv(moc, table.join(user_flags, flags, path(sourcefile), "-o", path(sourcefile_moc)))
 
-        -- we need compile this moc_xxx.cpp file if exists Q_PRIVATE_SLOT, @see https://github.com/xmake-io/xmake/issues/750
-        dependinfo.files = {}
+        -- we need to compile this moc_xxx.cpp file if exists Q_PRIVATE_SLOT, @see https://github.com/xmake-io/xmake/issues/750
         local mocdata = io.readfile(sourcefile)
         if mocdata and mocdata:find("Q_PRIVATE_SLOT") or sourcefile_moc:endswith(".moc") then
             -- add includedirs of sourcefile_moc
@@ -105,18 +107,15 @@ rule("qt.moc")
                     break
                 end
             end
+            batchcmds:set_depmtime(os.mtime(sourcefile_moc))
+            batchcmds:set_depcache(target:dependfile(sourcefile_moc))
         else
-            -- trace
-            if option.get("verbose") then
-                print(compinst:compcmd(sourcefile_moc, objectfile, {compflags = compflags}))
-            end
-
             -- compile c++ source file for moc
-            assert(compinst:compile(sourcefile_moc, objectfile, {dependinfo = dependinfo, compflags = compflags}))
+            batchcmds:compile(sourcefile_moc, objectfile)
+            batchcmds:set_depmtime(os.mtime(objectfile))
+            batchcmds:set_depcache(target:dependfile(objectfile))
         end
 
-        -- update files and values to the dependent file
-        dependinfo.values = depvalues
-        table.insert(dependinfo.files, sourcefile)
-        depend.save(dependinfo, dependfile)
+        -- add deps
+        batchcmds:add_depfiles(sourcefile)
     end)

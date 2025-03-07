@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -31,7 +31,8 @@ rule("xcode.xcassets")
         import("core.base.option")
         import("core.theme.theme")
         import("core.project.depend")
-        import("private.utils.progress")
+        import("core.tool.toolchain")
+        import("utils.progress")
 
         -- get xcode sdk directory
         local xcode_sdkdir = assert(get_config("xcode"), "xcode not found!")
@@ -42,7 +43,7 @@ rule("xcode.xcassets")
 
         -- need re-compile it?
         local dependfile = target:dependfile(sourcefile)
-        local dependinfo = option.get("rebuild") and {} or (depend.load(dependfile) or {})
+        local dependinfo = target:is_rebuilt() and {} or (depend.load(dependfile) or {})
         if not depend.is_changed(dependinfo, {lastmtime = os.mtime(dependfile)}) then
             return
         end
@@ -60,16 +61,18 @@ rule("xcode.xcassets")
         io.writefile(assetcatalog_generated_info_plist, "")
 
         -- do compile
-        local target_minver
+        local target_minver = nil
+        local toolchain_xcode = toolchain.load("xcode", {plat = target:plat(), arch = target:arch()})
+        if toolchain_xcode then
+            target_minver = toolchain_xcode:config("target_minver")
+        end
         local argv = {"--warnings", "--notices", "--output-format", "human-readable-text"}
-        if is_plat("macosx") then
-            target_minver = get_config("target_minver_macosx")
+        if target:is_plat("macosx") then
             table.insert(argv, "--target-device")
             table.insert(argv, "mac")
             table.insert(argv, "--platform")
             table.insert(argv, "macosx")
-        elseif is_plat("iphoneos") then
-            target_minver = get_config("target_minver_iphoneos")
+        elseif target:is_plat("iphoneos") then
             table.insert(argv, "--target-device")
             table.insert(argv, "iphone")
             table.insert(argv, "--target-device")
@@ -85,7 +88,7 @@ rule("xcode.xcassets")
         end
         table.insert(argv, "--app-icon")
         table.insert(argv, "AppIcon")
-        if is_plat("iphoneos") then
+        if target:is_plat("iphoneos") then
             table.insert(argv, "--enable-on-demand-resources")
             table.insert(argv, "YES")
             table.insert(argv, "--compress-pngs")

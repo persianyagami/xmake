@@ -12,23 +12,35 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        load.lua
 --
 
--- imports
-import("api")
+function _get_apis()
+    local apis = {}
+    apis.values = {
+        -- target.add_xxx
+        "target.add_mrcflags"
+        -- option.add_xxx
+    ,   "option.add_mrcflags"
+        -- toolchain.add_xxx
+    ,   "toolchain.add_mrcflags"
+    }
+    apis.paths = {
+        -- target.add_xxx
+        "target.add_includedirs"
+    ,   "target.add_sysincludedirs"
+        -- option.add_xxx
+    ,   "option.add_includedirs"
+    ,   "option.add_sysincludedirs"
+    }
+    return apis
+end
 
--- load it
 function main()
-
-    -- init apis
-    _g.apis = api.apis()
-
-    -- ok
-    return _g
+    return {apis = _get_apis()}
 end
 
 

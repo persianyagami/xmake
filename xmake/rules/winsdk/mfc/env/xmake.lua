@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      xigal, ruki
 -- @file        xmake.lua
@@ -22,5 +22,5 @@
 rule("win.sdk.mfc.env")
 
     -- TODO: before load need check of vs's minverion, if defined
-    before_load(function (target)
+    on_load(function (target)
     end)

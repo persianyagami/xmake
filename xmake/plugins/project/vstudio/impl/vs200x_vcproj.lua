@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        vs200x_vcproj.lua
@@ -70,7 +70,7 @@ end
 function _make_linkflags(target, vcprojdir)
 
     -- make the linking flags
-    local linkflags = linker.linkflags(target:targetkind(), target:sourcekinds(), {target = target})
+    local linkflags = linker.linkflags(target:kind(), target:sourcekinds(), {target = target})
 
     -- replace -libpath:dir or /libpath:dir, -pdb:symbol.pdb or /pdb:symbol.pdb
     local flags = {}
@@ -201,7 +201,7 @@ end
 function _make_VCLinkerTool(vcprojfile, vsinfo, target, vcprojdir)
 
     -- need not linker?
-    local kind = target:targetkind()
+    local kind = target:kind()
     if kind ~= "binary" and kind ~= "shared" then
         vcprojfile:enter("<Tool")
             vcprojfile:print("Name=\"VCLinkerTool\"")
@@ -292,7 +292,7 @@ function _make_configurations(vcprojfile, vsinfo, target, vcprojdir)
             vcprojfile:print("Name=\"$(mode)|Win32\"")
 			vcprojfile:print("OutputDirectory=\"%s\"", path.relative(path.absolute(target:targetdir()), vcprojdir))
 			vcprojfile:print("IntermediateDirectory=\"%s\"", path.relative(path.absolute(target:objectdir()), vcprojdir))
-			vcprojfile:print("ConfigurationType=\"%d\"", assert(configuration_types[target:targetkind()]))
+			vcprojfile:print("ConfigurationType=\"%d\"", assert(configuration_types[target:kind()]))
             vcprojfile:print("CharacterSet=\"%d\"", unicode and 1 or 2) -- mbc: 2, wcs: 1
             vcprojfile:print("UseOfMFC=\"%d\"", usemfc)
             vcprojfile:print(">")

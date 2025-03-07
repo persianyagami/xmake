@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        utils.lua
@@ -29,6 +29,9 @@ local log    = require("base/log")
 local io     = require("base/io")
 local dump   = require("base/dump")
 local text   = require("base/text")
+
+-- save original interfaces
+utils._bin2c = utils._bin2c or utils.bin2c
 
 -- dump values
 function utils.dump(...)
@@ -142,49 +145,25 @@ end
 
 -- print format string with newline
 function utils.print(format, ...)
-
-    -- check
     assert(format)
-
-    -- init message
     local message = string.tryformat(format, ...)
-
-    -- trace
     utils._print(message)
-
-    -- write to the log file
     log:printv(message)
 end
 
 -- print format string without newline
 function utils.printf(format, ...)
-
-    -- check
     assert(format)
-
-    -- init message
     local message = string.tryformat(format, ...)
-
-    -- trace
     utils._iowrite(message)
-
-    -- write to the log file
     log:write(message)
 end
 
 -- print format string and colors with newline
 function utils.cprint(format, ...)
-
-    -- check
     assert(format)
-
-    -- init message
     local message = string.tryformat(format, ...)
-
-    -- trace
     utils._print(colors.translate(message))
-
-    -- write to the log file
     if log:file() then
         log:printv(colors.ignore(message))
     end
@@ -192,17 +171,9 @@ end
 
 -- print format string and colors without newline
 function utils.cprintf(format, ...)
-
-    -- check
     assert(format)
-
-    -- init message
     local message = string.tryformat(format, ...)
-
-    -- trace
     utils._iowrite(colors.translate(message))
-
-    -- write to the log file
     if log:file() then
         log:write(colors.ignore(message))
     end
@@ -237,9 +208,9 @@ end
 
 -- add warning message
 function utils.warning(format, ...)
-
-    -- check
-    assert(format)
+    if option.get("quiet") then
+        return
+    end
 
     -- format message
     local args = table.pack(...)
@@ -268,11 +239,6 @@ function utils.show_warnings()
             utils.cprint("${bright color.warning}${text.warning}: ${color.warning}%s", msg)
         end
     end
-end
-
--- ifelse, a? b : c
-function utils.ifelse(a, b, c)
-    if a then return b else return c end
 end
 
 -- try to call script
@@ -314,18 +280,18 @@ function utils.confirm(opt)
     local description = opt.description or ""
 
     -- get confirm result
-    local confirm = option.get("yes") or option.get("confirm")
-    if type(confirm) == "string" then
-        confirm = confirm:lower()
-        if confirm == "d" or confirm == "def" then
-            confirm = default
+    local result = option.get("yes") or option.get("confirm")
+    if type(result) == "string" then
+        result = result:lower()
+        if result == "d" or result == "def" then
+            result = default
         else
-            confirm = nil
+            result = nil
         end
     end
 
     -- get user confirm
-    if confirm == nil then
+    if result == nil then
 
         -- show tips
         if type(description) == "function" then
@@ -333,16 +299,20 @@ function utils.confirm(opt)
         else
             utils.cprint("${bright color.warning}note: ${clear}%s (pass -y or --confirm=y/n/d to skip confirm)?", description)
         end
-        utils.cprint("please input: ${bright}%s${clear} (y/n)", default and "y" or "n")
 
         -- get answer
-        io.flush()
-        confirm = option.boolean((io.read() or "false"):trim())
-        if type(confirm) ~= "boolean" then
-            confirm = default
+        if opt.answer then
+            result = opt.answer()
+        else
+            utils.cprint("please input: ${bright}%s${clear} (y/n)", default and "y" or "n")
+            io.flush()
+            result = option.boolean((io.read() or "false"):trim())
+            if type(result) ~= "boolean" then
+                result = default
+            end
         end
     end
-    return confirm
+    return result
 end
 
 function utils.table(data, opt)
@@ -351,6 +321,12 @@ end
 
 function utils.vtable(data, opt)
     utils.vprintf(text.table(data, opt))
+end
+
+-- generate c/c++ code from the binary file
+function utils.bin2c(binaryfile, outputfile, opt)
+    opt = opt or {}
+    return utils._bin2c(binaryfile, outputfile, opt.linewidth or 32, opt.nozeroend or false)
 end
 
 -- return module

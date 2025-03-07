@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -25,13 +25,14 @@ import("core.base.hashset")
 import("core.project.config")
 import("core.project.project")
 import("core.platform.platform")
-import("core.project.cache")
-import("lib.detect.cache", {alias = "detectcache"})
+import("private.detect.find_platform")
+import("core.cache.localcache")
 import("scangen")
 import("menuconf", {alias = "menuconf_show"})
 import("configfiles", {alias = "generate_configfiles"})
-import("configheader", {alias = "generate_configheader"})
-import("actions.require.install", {alias = "install_requires", rootdir = os.programdir()})
+import("private.action.require.register", {alias = "register_packages"})
+import("private.action.require.install", {alias = "install_packages"})
+import("private.service.remote_build.action", {alias = "remote_build_action"})
 
 -- filter option
 function _option_filter(name)
@@ -47,6 +48,10 @@ function _option_filter(name)
     ,   verbose     = true
     ,   diagnosis   = true
     ,   require     = true
+    ,   export      = true
+    ,   import      = true
+    ,   check       = true
+    ,   menu        = true
     }
     return not options[name]
 end
@@ -61,21 +66,15 @@ function _need_check(changed)
 
     -- clean?
     if not changed then
-        changed = option.get("clean")
+        changed = option.get("clean") or option.get("check")
     end
 
-    -- get the current mtimes
+    -- check for all project files
     local mtimes = project.mtimes()
-
-    -- get the previous mtimes
-    local configcache = cache("local.config")
     if not changed then
-        local mtimes_prev = configcache:get("mtimes")
+        local mtimes_prev = localcache.get("config", "mtimes")
         if mtimes_prev then
-
-            -- check for all project files
             for file, mtime in pairs(mtimes) do
-
                 -- modified? reconfig and rebuild it
                 local mtime_prev = mtimes_prev[file]
                 if not mtime_prev or mtime > mtime_prev then
@@ -86,53 +85,39 @@ function _need_check(changed)
         end
     end
 
-    -- xmake has been updated? force to check config again
-    -- we need clean the dirty config cache of the old version
+    -- unfinished config/recheck
+    if not changed and localcache.get("config", "recheck") then
+        changed = true
+    end
+
+    -- Has xmake been updated? force to check config again
+    -- we need to clean the dirty config cache of the old version
     if not changed then
         if os.mtime(path.join(os.programdir(), "core", "main.lua")) > os.mtime(config.filepath()) then
             changed = true
         end
     end
-
-    -- update mtimes
-    configcache:set("mtimes", mtimes)
-
-    -- changed?
     return changed
 end
 
--- check dependent target
-function _check_target_deps(target)
-
-    -- check
-    for _, depname in ipairs(target:get("deps")) do
-
-        -- check dependent target name
-        assert(depname ~= target:name(), "the target(%s) cannot depend self!", depname)
-
-        -- get dependent target
-        local deptarget = project.target(depname)
-
-        -- check dependent target name
-        assert(deptarget, "unknown target(%s) for %s.deps!", depname, target:name())
-
-        -- check the dependent targets
-        _check_target_deps(deptarget)
+-- check target
+function _check_target(target, checked_targets)
+    if not checked_targets[target:fullname()] then
+        checked_targets[target:fullname()] = target
+        for _, depname in ipairs(target:get("deps")) do
+            local deptarget = project.target(depname, {namespace = target:namespace()})
+            assert(deptarget, "unknown target(%s) for %s.deps!", depname, target:fullname())
+            _check_target(deptarget, checked_targets)
+        end
     end
 end
 
--- check target
-function _check_target(targetname)
-    assert(targetname)
+-- check targets
+function _check_targets()
     assert(not project.is_loaded(), "project and targets may have been loaded early!")
-    if targetname == "all" then
-        for _, target in pairs(project.targets()) do
-            _check_target_deps(target)
-        end
-    else
-        local target = project.target(targetname)
-        assert(target, "unknown target: %s", targetname)
-        _check_target_deps(target)
+    local checked_targets = {}
+    for _, target in pairs(project.targets()) do
+        _check_target(target, checked_targets)
     end
 end
 
@@ -141,33 +126,101 @@ function _check_target_toolchains()
     -- check toolchains configuration for all target in the current project
     -- @note we must check targets after loading options
     for _, target in pairs(project.targets()) do
-        if target:get("enabled") ~= false and (target:get("toolchains") or not target:is_plat(config.get("plat"))) then
+        if target:is_enabled() and (target:get("toolchains") or
+                                    not target:is_plat(config.get("plat")) or
+                                    not target:is_arch(config.get("arch"))) then
+
+            -- check platform toolchains first
+            -- `target/set_plat()` and target:toolchains() need it
+            target:platform():check()
+
+            -- check target toolchains next
             local target_toolchains = target:get("toolchains")
             if target_toolchains then
                 target_toolchains = hashset.from(table.wrap(target_toolchains))
-            end
-            for _, toolchain_inst in pairs(target:toolchains()) do
-                -- check toolchains for `target/set_toolchains()`
-                if target_toolchains then
+                for _, toolchain_inst in pairs(target:toolchains()) do
+                    -- check toolchains for `target/set_toolchains()`
                     if not toolchain_inst:check() and target_toolchains:has(toolchain_inst:name()) then
                         raise("toolchain(\"%s\"): not found!", toolchain_inst:name())
                     end
-                else
-                    -- check platform toolchains for `target/set_plat()`
-                    local ok, errors = target:platform():check()
-                    if not ok then
-                        raise(errors)
-                    end
                 end
             end
+        elseif not target:get("toolset") then
+            -- we only abort it when we know that toolchains of platform and target do not found
+            local toolchain_found
+            for _, toolchain_inst in pairs(target:toolchains()) do
+                if toolchain_inst:is_standalone() then
+                    toolchain_found = true
+                end
+            end
+            assert(toolchain_found, "target(%s): toolchain not found!", target:name())
         end
     end
 end
 
--- main entry
-function main()
+-- find default mode
+function _find_default_mode()
+    local mode = config.mode()
+    if not mode then
+        mode = project.get("defaultmode")
+        if not mode then
+            mode = "release"
+        end
+        config.set("mode", mode)
+    end
+    return mode
+end
 
-    -- avoid to run this task repeatly
+-- check configs
+function _check_configs()
+    -- check allowed modes
+    local mode = config.mode()
+    local allowed_modes = project.allowed_modes()
+    if allowed_modes then
+        if not allowed_modes:has(mode) then
+            local allowed_modes_str = table.concat(allowed_modes:to_array(), ", ")
+            raise("`%s` is not a valid complation mode for this project, please use one of %s", mode, allowed_modes_str)
+        end
+    end
+
+    -- check allowed plats
+    local plat = config.plat()
+    local allowed_plats = project.allowed_plats()
+    if allowed_plats then
+        if not allowed_plats:has(plat) then
+            local allowed_plats_str = table.concat(allowed_plats:to_array(), ", ")
+            raise("`%s` is not a valid platform for this project, please use one of %s", plat, allowed_plats_str)
+        end
+    end
+
+    -- check allowed archs
+    local arch = config.arch()
+    local allowed_archs = project.allowed_archs(config.plat())
+    if allowed_archs then
+        if not allowed_archs:has(arch) then
+            local allowed_archs_str = table.concat(allowed_archs:to_array(), ", ")
+            raise("`%s` is not a valid complation arch for this project, please use one of %s", arch, allowed_archs_str)
+        end
+    end
+end
+
+-- export configs
+function _export_configs()
+    local exportfile = option.get("export")
+    if exportfile then
+        config.save(exportfile, {public = true})
+    end
+end
+
+function main(opt)
+
+    -- do action for remote?
+    if remote_build_action.enabled() then
+        return remote_build_action()
+    end
+
+    -- avoid running this task repeatly
+    opt = opt or {}
     if _g.configured then return end
     _g.configured = true
 
@@ -184,9 +237,12 @@ function main()
     end
 
     -- check the working directory
-    if not option.get("project") and not option.get("file") and os.isdir(os.projectdir()) then
+    if not option.get("project") and not option.get("file") and -- no given project path
+        not localcache.get("project", "projectdir") and -- no cached project path
+        not localcache.get("project", "projectfile") and
+        os.isdir(os.projectdir()) then
         if path.translate(os.projectdir()) ~= path.translate(os.workingdir()) then
-            utils.warning([[You are working in the project directory(%s) and you can also
+            wprint([[You are working in the project directory(%s) and you can also
 force to build in current directory via run `xmake -P .`]], os.projectdir())
         end
     end
@@ -200,13 +256,7 @@ force to build in current directory via run `xmake -P .`]], os.projectdir())
         options_changed = menuconf_show()
     end
 
-    -- the target name
-    local targetname = option.get("target") or "all"
-
-    -- get config cache
-    local configcache = cache("local.config")
-
-    -- load the project configure
+    -- load the project configuration
     --
     -- priority: option > option_cache > global > option_default > config_check > project_check > config_cache
     --
@@ -220,22 +270,36 @@ force to build in current directory via run `xmake -P .`]], os.projectdir())
         end
     end
 
-    -- override configure from the options or cache
+    -- merge options from the given import file
+    local importfile = option.get("import")
+    if importfile then
+        assert(os.isfile(importfile), "%s not found!", importfile)
+        -- we need to use readonly, @see https://github.com/xmake-io/xmake/issues/2278
+        local import_configs = io.load(importfile)
+        if import_configs then
+            for name, value in pairs(import_configs) do
+                options = options or {}
+                if options[name] == nil then
+                    options[name] = value
+                end
+            end
+        end
+    end
+
+    -- override configuration from the options or cache
     local options_history = {}
     if not option.get("clean") and not autogen then
-        options_history = configcache:get("options") or {}
+        options_history = localcache.get("config", "options") or {}
         options = options or options_history
     end
     for name, value in pairs(options) do
-
-        -- options is changed by argument options?
+        -- Is options changed by argument options?
         options_changed = options_changed or options_history[name] ~= value
-
         -- @note override it and mark as readonly (highest priority)
         config.set(name, value, {readonly = true})
     end
 
-    -- merge the cached configure
+    -- merge the cached configuration
     --
     -- @note we cannot load cache config when switching platform, arch ..
     -- so we need known whether options have been changed
@@ -245,7 +309,7 @@ force to build in current directory via run `xmake -P .`]], os.projectdir())
         configcache_loaded = config.load()
     end
 
-    -- merge the global configure
+    -- merge the global configuration
     for name, value in pairs(global.options()) do
         if config.get(name) == nil then
             config.set(name, value)
@@ -268,24 +332,44 @@ force to build in current directory via run `xmake -P .`]], os.projectdir())
         end
     end
 
-    -- merge the checked configure
+    -- find default mode
+    local mode = _find_default_mode()
+    assert(mode == config.mode())
+
+    -- find default platform and save to configuration
+    local plat, arch = find_platform({global = true})
+    assert(plat == config.plat())
+    assert(arch == config.arch())
+
+    -- load platform instance
+    local instance_plat = platform.load(plat, arch)
+
+    -- merge the checked configuration
     local recheck = _need_check(options_changed or not configcache_loaded or autogen)
     if recheck then
 
-        -- clear detect cache
-        detectcache.clear()
+        -- clear cached configuration
+        if option.get("clean") then
+            localcache.clear("config")
+        end
 
-        -- check configure
-        config.check()
+        -- clear some local caches
+        localcache.clear("detect")
+        localcache.clear("option")
+        localcache.clear("package")
+        localcache.clear("toolchain")
+        localcache.clear("cxxmodules")
+        localcache.set("config", "recheck", true)
+        localcache.save()
+
+        -- check platform
+        instance_plat:check()
 
         -- check project options
         if not trybuild then
-            project.check()
+            project.check_options()
         end
     end
-
-    -- load platform
-    platform.load(config.plat())
 
     -- translate the build directory
     local buildir = config.get("buildir")
@@ -296,39 +380,64 @@ force to build in current directory via run `xmake -P .`]], os.projectdir())
     -- only config for building project using third-party buildsystem
     if not trybuild then
 
-        -- install and update requires and config header
+        -- check configs
+        _check_configs()
+
+        -- install and register packages
         local require_enable = option.boolean(option.get("require"))
-        if (recheck or require_enable) and require_enable ~= false then
-            install_requires()
+        if (recheck or require_enable) then
+            if require_enable ~= false then
+                install_packages()
+            else
+                register_packages()
+            end
         end
 
         -- check target and ensure to load all targets, @note we must load targets after installing required packages,
         -- otherwise has_package() will be invalid.
-        _check_target(targetname)
-
-        -- update the config header
-        if recheck then
-            generate_configfiles()
-            generate_configheader()
-        end
+        _check_targets()
 
         -- check target toolchains
         if recheck then
             _check_target_toolchains()
         end
+
+        -- load targets
+        project.load_targets({recheck = recheck})
+
+        -- update the config files
+        generate_configfiles({force = recheck})
     end
 
     -- dump config
-    if option.get("verbose") then
+    if option.get("verbose") and not opt.disable_dump then
         config.dump()
     end
 
-    -- save options and configure for the given target
-    config.save()
-    configcache:set("options", options)
+    -- export configs
+    if option.get("export") then
+        _export_configs()
+    end
 
-    -- flush config cache
-    configcache:flush()
+    -- we need to save it and enable external working mode
+    -- if we configure the given project directory
+    --
+    -- @see https://github.com/xmake-io/xmake/issues/3342
+    --
+    local projectdir = option.get("project")
+    local projectfile = option.get("file")
+    if projectdir or projectfile then
+        localcache.set("project", "projectdir", projectdir)
+        localcache.set("project", "projectfile", projectfile)
+        localcache.save("project")
+    end
+
+    -- save options and config cache
+    localcache.set("config", "recheck", false)
+    localcache.set("config", "mtimes", project.mtimes())
+    config.save()
+    localcache.set("config", "options", options)
+    localcache.save("config")
 
     -- unlock the whole project
     project.unlock()

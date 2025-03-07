@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        load.lua
@@ -71,6 +71,7 @@ function driver_kmdf(target)
     -- compile as kernel driver
     target:add("cxflags", "-kernel", {force = true})
     target:add("ldflags", "-kernel", "-driver", {force = true})
+    target:add("ldflags", "-nodefaultlib", {force = true})
 
     -- add subsystem
     target:add("ldflags", "-subsystem:native," .. os_winver.subsystem(winver), {force = true})
@@ -78,10 +79,12 @@ function driver_kmdf(target)
     -- set default driver entry if does not exist
     local entry = false
     for _, ldflag in ipairs(target:get("ldflags")) do
-        ldflag = ldflag:lower()
-        if ldflag:find("[/%-]entry:") then
-            entry = true
-            break
+        if type(ldflag) == "string" then
+            ldflag = ldflag:lower()
+            if ldflag:find("[/%-]entry:") then
+                entry = true
+                break
+            end
         end
     end
     if not entry then
@@ -111,6 +114,7 @@ function driver_wdm(target)
     -- compile as kernel driver
     target:add("cxflags", "-kernel", {force = true})
     target:add("ldflags", "-kernel", "-driver", {force = true})
+    target:add("ldflags", "-nodefaultlib", {force = true})
 
     -- add subsystem
     target:add("ldflags", "-subsystem:native," .. os_winver.subsystem(winver), {force = true})
@@ -118,10 +122,12 @@ function driver_wdm(target)
     -- set default driver entry if does not exist
     local entry = false
     for _, ldflag in ipairs(target:get("ldflags")) do
-        ldflag = ldflag:lower()
-        if ldflag:find("[/%-]entry:") then
-            entry = true
-            break
+        if type(ldflag) == "string" then
+            ldflag = ldflag:lower()
+            if ldflag:find("[/%-]entry:") then
+                entry = true
+                break
+            end
         end
     end
     if not entry then

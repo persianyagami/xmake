@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        socket_sendfile.c
@@ -96,7 +96,7 @@ tb_int_t xm_io_socket_sendfile(lua_State* lua)
     if (start < 1 || start > filesize)
     {
         lua_pushinteger(lua, -1);
-        lua_pushfstring(lua, "invalid start position(%ld)!", start);
+        lua_pushfstring(lua, "invalid start position(%d)!", (tb_int_t)start);
         return 2;
     }
 
@@ -106,7 +106,7 @@ tb_int_t xm_io_socket_sendfile(lua_State* lua)
     if (last < start - 1 || last > filesize + start - 1)
     {
         lua_pushinteger(lua, -1);
-        lua_pushfstring(lua, "invalid last position(%ld)!", last);
+        lua_pushfstring(lua, "invalid last position(%d)!", (tb_int_t)last);
         return 2;
     }
 

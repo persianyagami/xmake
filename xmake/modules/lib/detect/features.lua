@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        features.lua
@@ -57,34 +57,25 @@ function main(name, opt)
     _g._RESULTS = _g._RESULTS or {}
     local results = _g._RESULTS
 
-    -- @note avoid detect the same program in the same time if running in the coroutine (e.g. ccache)
-    local coroutine_running = scheduler.co_running()
-    if coroutine_running then
-        while _g._checking ~= nil and _g._checking == key do
-            scheduler.co_yield()
-        end
-    end
+    -- @see https://github.com/xmake-io/xmake/issues/4645
+    -- @note avoid detect the same program in the same time leading to deadlock if running in the coroutine (e.g. ccache)
+    scheduler.co_lock(key)
 
     -- get result from the cache first
     local result = results[key]
     if result ~= nil then
+        scheduler.co_unlock(key)
         return result
     end
 
-    -- detect.tools.xxx.features(opt)?
-    _g._checking = ifelse(coroutine_running, key, nil)
-    local features = import("detect.tools." .. tool.name .. ".features", {try = true})
+    -- core.tools.xxx.features(opt)?
+    local features = import("core.tools." .. tool.name .. ".features", {try = true})
     if features then
         result = features(opt)
     end
-    _g._checking = nil
 
-    -- no features?
     result = result or {}
-
-    -- save result to cache
     results[key] = result
-
-    -- ok?
+    scheduler.co_unlock(key)
     return result
 end

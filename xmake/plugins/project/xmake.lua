@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -30,7 +30,7 @@ task("project")
     -- set menu
     set_menu {
                 -- usage
-                usage = "xmake project [options] [target]"
+                usage = "xmake project [options] [outputdir]"
 
                 -- description
             ,   description = "Generate the project file."
@@ -46,9 +46,8 @@ task("project")
                                                         ,   "    - xcode (need cmake)"
                                                         ,   "    - compile_flags"
                                                         ,   "    - compile_commands (clang compilation database with json format)"
-                                                        ,   "    - vs (auto detect), vs2002, vs2003, vs2005, vs2008"
-                                                        ,   "    - vs2010, vs2012, vs2013, vs2015, vs2017, vs2019"
-                                                        ,   "    - vsxmake (auto detect), vsxmake2010 ~ vsxmake2019"
+                                                        ,   "    - vs (auto detect), vs2002 - vs2022"
+                                                        ,   "    - vsxmake (auto detect), vsxmake2010 ~ vsxmake2022"
                                                         ,   values = function (complete, opt)
                                                                 if not complete then return end
 
@@ -58,10 +57,14 @@ task("project")
                                                             end                                                                             }
                 ,   {'m', "modes",     "kv" , nil       ,   "Set the project modes."
                                                         ,   "    e.g. "
-                                                        ,   "    - xmake project -k vsxmake -m \"release" .. path.envsep() ..  "debug\""    }
-                ,   {'a', "archs",     "kv" , nil       ,          "Set the project archs."
+                                                        ,   "    - xmake project -k vsxmake -m \"release,debug\""                           }
+                ,   {'a', "archs",     "kv" , nil       ,   "Set the project archs."
                                                         ,   "    e.g. "
-                                                        ,   "    - xmake project -k vsxmake -a \"x86" .. path.envsep() ..  "x64\""          }
+                                                        ,   "    - xmake project -k vsxmake -a \"x86,x64\""                                 }
+                ,   {nil, "lsp",       "kv" , nil       ,   "Set the LSP backend for compile_commands."
+                                                        ,   "    e.g. "
+                                                        ,   "    - xmake project -k compile_commands --lsp=clangd"
+                                                        ,   values = {"clangd", "cpptools", "ccls"}}
                 ,   {nil, "outputdir", "v"  , "."       ,   "Set the output directory."                                                     }
                 }
             }

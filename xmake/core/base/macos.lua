@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        macos.lua
@@ -33,21 +33,13 @@ function macos.version()
         return macos._VERSION
     end
 
-    -- get macver
+    -- get mac version
     local macver = nil
     local ok, verstr = os.iorun("sw_vers -productVersion")
     if ok and verstr then
-        macver = verstr:match("%d+%.%d+%.%d+")
-        if macver then
-            macver = macver:trim()
-        end
-        macver = semver.new(macver)
+        macver = semver.new(verstr:trim())
     end
-
-    -- save to cache
     macos._VERSION = macver or false
-
-    -- done
     return macver
 end
 

@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        logical_drives.c
@@ -41,7 +41,6 @@ tb_int_t xm_winos_logical_drives(lua_State* lua)
     lua_newtable(lua);
 
     // get logical drives
-    tb_bool_t  ok = tb_false;
     tb_char_t* data = tb_null;
     do
     {
@@ -70,10 +69,6 @@ tb_int_t xm_winos_logical_drives(lua_State* lua)
             // next drive
             p += tb_strlen(p) + 1;
         }
-
-        // ok
-        ok = tb_true;
-
     } while (0);
 
     // exit data

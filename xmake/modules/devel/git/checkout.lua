@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        checkout.lua
@@ -20,6 +20,7 @@
 
 -- imports
 import("core.base.option")
+import("core.base.semver")
 import("lib.detect.find_tool")
 
 -- checkout to given branch, tag or commit
@@ -37,27 +38,25 @@ import("lib.detect.find_tool")
 -- @endcode
 --
 function main(commit, opt)
-
-    -- init options
     opt = opt or {}
-
-    -- find git
-    local git = assert(find_tool("git"), "git not found!")
-
-    -- init argv
-    local argv = {"checkout", commit}
-
-    -- enter repository directory
-    local oldir = nil
-    if opt.repodir then
-        oldir = os.cd(opt.repodir)
+    local git = assert(find_tool("git", {version = true}), "git not found!")
+    local argv = {}
+    if opt.fsmonitor then
+        table.insert(argv, "-c")
+        table.insert(argv, "core.fsmonitor=true")
+    else
+        table.insert(argv, "-c")
+        table.insert(argv, "core.fsmonitor=false")
     end
 
-    -- checkout it
-    os.vrunv(git.program, argv)
-
-    -- leave repository directory
-    if oldir then
-        os.cd(oldir)
+    -- @see https://github.com/xmake-io/xmake/issues/6071
+    -- https://github.blog/open-source/git/bring-your-monorepo-down-to-size-with-sparse-checkout/
+    if opt.includes and git.version and semver.compare(git.version, "2.25") >= 0 then
+        os.vrunv(git.program, {"sparse-checkout", "init", "--cone"}, {curdir = opt.repodir})
+        os.vrunv(git.program, table.join({"sparse-checkout", "set"}, opt.includes), {curdir = opt.repodir})
     end
+
+    table.insert(argv, "checkout")
+    table.insert(argv, commit)
+    os.vrunv(git.program, argv, {curdir = opt.repodir})
 end

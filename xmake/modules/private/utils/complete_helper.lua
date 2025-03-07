@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      OpportunityLiu
 -- @file        complete_helper.lua
@@ -28,21 +28,21 @@ function targets()
     {
         function ()
             config.load()
-            return table.keys(project.targets())
+            return table.orderkeys(project.targets())
         end
     }
 end
 
 -- get runnable targets
-function runable_targets()
+function runable_targets(complete, opt)
     return try
     {
         function ()
             config.load()
             local targets = project.targets()
             local runable = {}
-            for k, v in pairs(targets) do
-                if v:script("run") or v:get("kind") == "binary" then
+            for k, v in table.orderpairs(targets) do
+                if (v:script("run") or v:is_binary()) and (not complete or k:startswith(complete)) then
                     table.insert(runable, k)
                 end
             end

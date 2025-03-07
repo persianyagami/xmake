@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_7z.lua
@@ -43,10 +43,21 @@ function main(opt)
     opt.command = opt.command or "--help"
     opt.parse   = "(%d+%.?%d*)%s"
 
+    -- find 7z from builtin xmake/winenv
+    if is_host("windows") then
+        opt.paths = opt.paths or {}
+        table.insert(opt.paths, path.join(os.programdir(), "winenv", "bin"))
+    end
+
     -- find program
     local program = find_program(opt.program or "7z", opt)
     if not program and not opt.program then
         program = find_program("7za", opt)
+    end
+
+    -- find it from msys/mingw, it is only a shell script
+    if not program and is_subhost("msys") then
+        program = find_program("sh 7z", opt)
     end
 
     -- find program version
@@ -54,7 +65,5 @@ function main(opt)
     if program and opt and opt.version then
         version = find_programver(program, opt)
     end
-
-    -- ok?
     return program, version
 end
