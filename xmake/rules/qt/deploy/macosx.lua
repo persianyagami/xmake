@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        macosx.lua
@@ -23,12 +23,23 @@ import("core.theme.theme")
 import("core.base.option")
 import("core.project.config")
 import("core.project.depend")
+import("core.tool.toolchain")
+import("lib.detect.find_file")
 import("lib.detect.find_path")
-import("private.utils.progress")
+import("detect.sdks.find_qt")
+import("utils.progress")
 
 -- save Info.plist
 function _save_info_plist(target, info_plist_file)
 
+    -- get target minver
+    local target_minver = nil
+    local toolchain_xcode = toolchain.load("xcode", {plat = target:plat(), arch = target:arch()})
+    if toolchain_xcode then
+        target_minver = toolchain_xcode:config("target_minver")
+    end
+
+    -- generate info.plist
     local name = target:basename()
     io.writefile(info_plist_file, string.format([[<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -59,7 +70,7 @@ function _save_info_plist(target, info_plist_file)
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>
-</plist>]], name, name, name, name, get_config("target_minver_macosx") or (macos.version():major() .. "." .. macos.version():minor())))
+</plist>]], name, name, name, name, target_minver or (macos.version():major() .. "." .. macos.version():minor())))
 end
 
 -- deploy application package for macosx
@@ -69,7 +80,7 @@ function main(target, opt)
     local target_app = path.join(target:targetdir(), target:basename() .. ".app")
     local targetfile = target:targetfile()
     local dependfile = target:dependfile(target_app)
-    local dependinfo = option.get("rebuild") and {} or (depend.load(dependfile) or {})
+    local dependinfo = target:is_rebuilt() and {} or (depend.load(dependfile) or {})
     if not depend.is_changed(dependinfo, {lastmtime = os.mtime(dependfile)}) then
         return
     end
@@ -78,10 +89,13 @@ function main(target, opt)
     progress.show(opt.progress, "${color.build.target}generating.qt.app %s.app", target:basename())
 
     -- get qt sdk
-    local qt = target:data("qt")
+    local qt = assert(find_qt(), "Qt SDK not found!")
 
     -- get macdeployqt
-    local macdeployqt = path.join(qt.bindir, "macdeployqt")
+    local search_dirs = {}
+    if qt.bindir_host then table.insert(search_dirs, qt.bindir_host) end
+    if qt.bindir then table.insert(search_dirs, qt.bindir) end
+    local macdeployqt = find_file("macdeployqt" .. (is_host("windows") and ".exe" or ""), search_dirs)
     assert(os.isexec(macdeployqt), "macdeployqt not found!")
 
     -- generate target app
@@ -94,16 +108,20 @@ function main(target, opt)
     _save_info_plist(target, path.join(target_contents, "Info.plist"))
 
     -- find qml directory
-    local qmldir = nil
-    for _, sourcebatch in pairs(target:sourcebatches()) do
-        if sourcebatch.rulename == "qt.qrc" then
-            for _, sourcefile in ipairs(sourcebatch.sourcefiles) do
-                qmldir = find_path("*.qml", path.directory(sourcefile))
-                if qmldir then
-                    break
+    local qmldir = target:values("qt.deploy.qmldir")
+    if not qmldir then
+        for _, sourcebatch in pairs(target:sourcebatches()) do
+            if sourcebatch.rulename == "qt.qrc" then
+                for _, sourcefile in ipairs(sourcebatch.sourcefiles) do
+                    qmldir = find_path("*.qml", path.directory(sourcefile))
+                    if qmldir then
+                        break
+                    end
                 end
             end
         end
+    else
+        qmldir = path.join(target:scriptdir(), qmldir)
     end
 
     -- do deploy
@@ -123,6 +141,13 @@ function main(target, opt)
         -- e.g. "Apple Development: waruqi@gmail.com (T3NA4MRVPU)"
         table.insert(argv, "-codesign=" .. codesign_identity)
     end
+
+    -- add user flags
+    local user_flags = target:values("qt.deploy.flags") or {}
+    if user_flags then
+        argv = table.join(argv, user_flags)
+    end
+
     os.vrunv(macdeployqt, argv)
 
     -- update files and values to the dependent file

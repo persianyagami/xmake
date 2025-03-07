@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        global.lua
@@ -108,6 +108,11 @@ function global.directory()
         global._DIRECTORY = path.join(rootdir, name)
     end
     return global._DIRECTORY
+end
+
+-- get the global cache directory
+function global.cachedir()
+    return global.get("cachedir") or path.join(global.directory(), "cache")
 end
 
 -- load the global configuration

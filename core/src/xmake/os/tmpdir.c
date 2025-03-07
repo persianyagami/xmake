@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        tmpdir.c
@@ -38,11 +38,9 @@ tb_int_t xm_os_tmpdir(lua_State* lua)
     // check
     tb_assert_and_check_return_val(lua, 0);
 
-    // done os.tmpdir()
+    // os.tmpdir()
     tb_char_t path[TB_PATH_MAXN];
     if (tb_directory_temporary(path, sizeof(path))) lua_pushstring(lua, path);
     else lua_pushnil(lua);
-
-    // ok
     return 1;
 }

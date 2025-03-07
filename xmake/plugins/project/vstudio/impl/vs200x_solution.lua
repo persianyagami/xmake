@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        vs200x_solution.lua
@@ -36,12 +36,12 @@ function _make_projects(slnfile, vsinfo)
 
     -- make all targets
     for targetname, target in pairs(project.targets()) do
-        if not target:isphony() then
+        if not target:is_phony() then
 
             -- enter project
             slnfile:enter("Project(\"{%s}\") = \"%s\", \"%s\\%s.vcproj\", \"{%s}\"", vctool, targetname, targetname, targetname, hash.uuid4(targetname))
 
-            -- add dependences
+            -- add dependencies
             for _, dep in ipairs(target:get("deps")) do
                 slnfile:enter("ProjectSection(ProjectDependencies) = postProject")
                 slnfile:print("{%s} = {%s}", hash.uuid4(dep), hash.uuid4(dep))
@@ -68,7 +68,7 @@ function _make_global(slnfile, vsinfo)
     -- add project configuration platforms
     slnfile:enter("GlobalSection(ProjectConfigurationPlatforms) = postSolution")
     for targetname, target in pairs(project.targets()) do
-        if not target:isphony() then
+        if not target:is_phony() then
             slnfile:print("{%s}.$(mode)|Win32.ActiveCfg = $(mode)|Win32", hash.uuid4(targetname))
             slnfile:print("{%s}.$(mode)|Win32.Build.0 = $(mode)|Win32", hash.uuid4(targetname))
         end

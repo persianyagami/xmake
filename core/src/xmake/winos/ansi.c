@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      OpportunityLiu
  * @file        ansi.c
@@ -96,7 +96,6 @@ tb_int_t xm_winos_cp_info(lua_State* lua)
     // check
     tb_assert_and_check_return_val(lua, 0);
 
-    tb_int_t    n  = lua_gettop(lua);
     lua_Integer cp = luaL_checkinteger(lua, 1);
     luaL_argcheck(lua, cp >= 0 && cp < 65536, 1, "invalid code page");
     CPINFOEX cp_info;
@@ -107,7 +106,7 @@ tb_int_t xm_winos_cp_info(lua_State* lua)
     lua_pushliteral(lua, "name");
     tb_char_t* namebuf = tb_malloc_cstr(sizeof(cp_info.CodePageName) * 2);
     tb_assert_and_check_return_val(namebuf, 0);
-    tb_size_t namelen = tb_wtoa(namebuf, cp_info.CodePageName, sizeof(cp_info.CodePageName) * 2);
+    tb_size_t namelen = tb_wtoa(namebuf, (const tb_wchar_t *)cp_info.CodePageName, sizeof(cp_info.CodePageName) * 2);
     tb_assert_and_check_return_val(namelen < sizeof(cp_info.CodePageName) * 2, 0);
     lua_pushlstring(lua, namebuf, namelen);
     tb_free(namebuf);

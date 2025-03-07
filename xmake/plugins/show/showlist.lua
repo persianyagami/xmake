@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        showlist.lua
@@ -21,14 +21,14 @@
 -- imports
 import("core.base.option")
 import("core.base.text")
+import("core.base.json")
 
--- show values
-function main(values)
+function _show_text(values)
     local tbl = {align = 'l', sep = "    "}
     local row = {}
     for _, value in ipairs(values) do
         table.insert(row, value)
-        if #row > 5 then
+        if #row > 2 then
             table.insert(tbl, row)
             row = {}
         end
@@ -37,4 +37,23 @@ function main(values)
         table.insert(tbl, row)
     end
     print(text.table(tbl))
+end
+
+function _show_json(values)
+    print(json.encode(values))
+end
+
+function main(values)
+    if option.get("json") then
+        _show_json(values)
+    else
+        if table.is_dictionary(values) then
+            for k, v in pairs(values) do
+                cprint("${bright}%s:", k)
+                _show_text(v)
+            end
+        else
+            _show_text(values)
+        end
+    end
 end

@@ -12,47 +12,25 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define platform
 platform("macosx")
-
-    -- set os
     set_os("macosx")
-
-    -- set hosts
     set_hosts("macosx")
+    set_archs("x86_64", "arm64")
 
-    -- set archs
-    set_archs("i386", "x86_64", "arm64")
-
-    -- set formats
     set_formats("static", "lib$(name).a")
     set_formats("object", "$(name).o")
     set_formats("shared", "lib$(name).dylib")
     set_formats("symbol", "$(name).dSYM")
 
-    -- set install directory
     set_installdir("/usr/local")
+    set_toolchains("envs", "xcode", "clang", "gcc", "yasm", "nasm", "cuda", "rust", "go", "gfortran", "zig", "fpc", "nim")
 
-    -- on check
-    on_check(function (platform)
-        import("core.project.config")
-        local arch = config.get("arch")
-        if not arch then
-            config.set("arch", os.arch())
-            cprint("checking for architecture ... ${color.success}%s", config.get("arch"))
-        end
-    end)
-
-    -- set toolchains
-    set_toolchains("envs", "xcode", "clang", "gcc", "yasm", "nasm", "cuda", "dlang", "rust", "go", "gfortran", "zig")
-
-    -- set menu
     set_menu {
                 config =
                 {
@@ -63,10 +41,13 @@ platform("macosx")
                 ,   {nil, "xcode_codesign_identity", "kv", "auto",       "The Codesign Identity for Xcode"   }
                 ,   {nil, "xcode_mobile_provision",  "kv", "auto",       "The Mobile Provision for Xcode"    }
                 ,   {nil, "target_minver",           "kv", "auto",       "The Target Minimal Version"        }
+                ,   {nil, "appledev",                "kv", nil,          "The Apple Device Type",
+                                                                         values = {"simulator", "iphone", "watchtv", "appletv", "catalyst"}}
                 ,   {category = "Cuda SDK Configuration"                                                     }
                 ,   {nil, "cuda",                    "kv", "auto",       "The Cuda SDK Directory"            }
                 ,   {category = "Qt SDK Configuration"                                                       }
                 ,   {nil, "qt",                      "kv", "auto",       "The Qt SDK Directory"              }
+                ,   {nil, "qt_host",                 "kv", "auto",       "The Qt Host SDK Directory"         }
                 ,   {nil, "qt_sdkver",               "kv", "auto",       "The Qt SDK Version"                }
                 ,   {category = "Vcpkg Configuration"                                                        }
                 ,   {nil, "vcpkg",                   "kv", "auto",       "The Vcpkg Directory"               }
@@ -83,6 +64,7 @@ platform("macosx")
                 ,   {nil, "cuda",                    "kv", "auto",       "The Cuda SDK Directory"            }
                 ,   {category = "Qt SDK Configuration"                                                       }
                 ,   {nil, "qt",                      "kv", "auto",       "The Qt SDK Directory"              }
+                ,   {nil, "qt_host",                 "kv", "auto",       "The Qt Host SDK Directory"         }
                 ,   {category = "Vcpkg Configuration"                                                        }
                 ,   {nil, "vcpkg",                   "kv", "auto",       "The Vcpkg Directory"               }
                 }

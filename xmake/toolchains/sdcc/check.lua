@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        check.lua
@@ -20,18 +20,19 @@
 
 -- imports
 import("core.project.config")
+import("lib.detect.find_tool")
 import("detect.sdks.find_cross_toolchain")
 
 -- check the cross toolchain
 function main(toolchain)
-    local sdkdir = config.get("sdk")
-    local bindir = config.get("bin")
+    local sdkdir = toolchain:sdkdir()
+    local bindir = toolchain:bindir()
     local cross_toolchain = find_cross_toolchain(sdkdir, {bindir = bindir})
     if cross_toolchain then
-        config.set("cross", cross_toolchain.cross, {readonly = true, force = true})
-        config.set("bin", cross_toolchain.bindir, {readonly = true, force = true})
-    else
-        raise("sdcc toolchain not found!")
+        toolchain:config_set("cross", cross_toolchain.cross)
+        toolchain:config_set("bindir", cross_toolchain.bindir)
+        toolchain:configs_save()
+        return true
     end
-    return cross_toolchain
+    return find_tool("sdcc")
 end

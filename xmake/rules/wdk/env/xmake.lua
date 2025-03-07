@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -22,7 +22,7 @@
 rule("wdk.env")
 
     -- before load
-    before_load(function (target)
+    on_load(function (target)
 
         -- imports
         import("os.winver", {alias = "os_winver"})
@@ -47,9 +47,9 @@ rule("wdk.env")
                 wdk.kmdfver = kmdfver
             end
 
-            -- add defines for debug
+            -- add definitions for debug
             if is_mode("debug") then
-                target:add("define", "DBG=1")
+                target:add("defines", "DBG=1")
             end
 
             -- get winver name
@@ -67,7 +67,7 @@ rule("wdk.env")
             -- get ntddi version
             local ntddi_version = os_winver.ntddi_version(winver or "") or "0x0A000000"
 
-            -- add defines for winver
+            -- add definitions for winver
             target:add("defines", "_WIN32_WINNT=" .. winnt_version, "WINVER=" .. winver_version, "NTDDI_VERSION=" .. ntddi_version, "_NT_TARGET_VERSION=" .. target_version)
 
             -- set builtin version values

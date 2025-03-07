@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -28,7 +28,7 @@ rule("wdk.mc")
     set_extensions(".mc")
 
     -- before load
-    before_load(function (target)
+    on_load(function (target)
 
         -- imports
         import("core.project.config")
@@ -57,7 +57,7 @@ rule("wdk.mc")
         import("core.base.option")
         import("core.theme.theme")
         import("core.project.depend")
-        import("private.utils.progress")
+        import("utils.progress")
 
         -- get mc
         local mc = target:data("wdk.mc")
@@ -92,7 +92,7 @@ rule("wdk.mc")
 
         -- need build this object?
         local dependfile = target:dependfile(headerfile)
-        local dependinfo = option.get("rebuild") and {} or (depend.load(dependfile) or {})
+        local dependinfo = target:is_rebuilt() and {} or (depend.load(dependfile) or {})
         if not depend.is_changed(dependinfo, {lastmtime = os.mtime(headerfile), values = args}) then
             return
         end

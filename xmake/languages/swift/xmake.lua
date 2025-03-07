@@ -12,44 +12,25 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define language
 language("swift")
-
-    -- set source file kinds
+    add_rules("swift")
     set_sourcekinds {sc = ".swift"}
-
-    -- set source file flags
     set_sourceflags {sc = "scflags"}
-
-    -- set target kinds
     set_targetkinds {binary = "scld", static = "ar", shared = "scsh"}
-
-    -- set target flags
     set_targetflags {binary = "ldflags", static = "arflags", shared = "shflags"}
-
-    -- set language kinds
-    set_langkinds {swift = "sc"}
-
-    -- set mixing kinds
+    set_langkinds   {swift = "sc"}
     set_mixingkinds("sc", "mm", "mxx", "cc", "cxx")
 
-    -- add rules
-    add_rules("swift")
-
-    -- on load
     on_load("load")
 
-    -- set name flags
-    set_nameflags
-    {
-        object =
-        {
+    set_nameflags {
+        object = {
             "config.includedirs"
         ,   "config.frameworkdirs"
         ,   "config.Frameworks"
@@ -63,26 +44,13 @@ language("swift")
         ,   "target.undefines"
         ,   "target.frameworkdirs"
         ,   "target.frameworks"
-        ,   "option.symbols"
-        ,   "option.warnings"
-        ,   "option.optimize:check"
-        ,   "option.vectorexts:check"
-        ,   "option.languages"
-        ,   "option.includedirs"
-        ,   "option.defines"
-        ,   "option.undefines"
-        ,   "option.defines_if_ok"
-        ,   "option.undefines_if_ok"
-        ,   "option.frameworkdirs"
-        ,   "option.frameworks"
         ,   "toolchain.includedirs"
         ,   "toolchain.defines"
         ,   "toolchain.undefines"
         ,   "toolchain.frameworkdirs"
         ,   "toolchain.frameworks"
         }
-    ,   binary =
-        {
+    ,   binary = {
             "config.linkdirs"
         ,   "config.frameworkdirs"
         ,   "target.linkdirs"
@@ -90,62 +58,44 @@ language("swift")
         ,   "target.frameworkdirs"
         ,   "target.strip"
         ,   "target.symbols"
-        ,   "option.strip"
-        ,   "option.symbols"
-        ,   "option.linkdirs"
-        ,   "option.rpathdirs"
-        ,   "option.frameworkdirs"
         ,   "toolchain.linkdirs"
         ,   "toolchain.rpathdirs"
         ,   "toolchain.frameworkdirs"
         ,   "config.links"
         ,   "target.links"
-        ,   "option.links"
         ,   "toolchain.links"
         ,   "config.frameworks"
         ,   "target.frameworks"
-        ,   "option.frameworks"
         ,   "toolchain.frameworks"
         ,   "config.syslinks"
         ,   "target.syslinks"
-        ,   "option.syslinks"
         ,   "toolchain.syslinks"
         }
-    ,   shared =
-        {
+    ,   shared = {
             "config.linkdirs"
         ,   "config.frameworkdirs"
         ,   "target.linkdirs"
         ,   "target.frameworkdirs"
         ,   "target.strip"
         ,   "target.symbols"
-        ,   "option.strip"
-        ,   "option.symbols"
-        ,   "option.linkdirs"
-        ,   "option.frameworkdirs"
         ,   "toolchain.linkdirs"
         ,   "toolchain.frameworkdirs"
         ,   "config.links"
         ,   "target.links"
-        ,   "option.links"
         ,   "toolchain.links"
         ,   "config.frameworks"
         ,   "target.frameworks"
-        ,   "option.frameworks"
         ,   "toolchain.frameworks"
         ,   "config.syslinks"
         ,   "target.syslinks"
-        ,   "option.syslinks"
         ,   "toolchain.syslinks"
         }
-    ,   static =
-        {
+    ,   static = {
             "target.strip"
         ,   "target.symbols"
         }
     }
 
-    -- set menu
     set_menu {
                 config =
                 {

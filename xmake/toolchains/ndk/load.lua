@@ -12,14 +12,54 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        load.lua
 --
 
 -- imports
+import("core.base.hashset")
 import("core.project.config")
+
+-- get triple
+function _get_triple(arch)
+    local triples =
+    {
+        ["armv5te"]     = "arm-linux-androideabi"   -- deprecated
+    ,   ["armv7-a"]     = "arm-linux-androideabi"   -- deprecated
+    ,   ["armeabi"]     = "arm-linux-androideabi"   -- removed in ndk r17
+    ,   ["armeabi-v7a"] = "arm-linux-androideabi"
+    ,   ["arm64-v8a"]   = "aarch64-linux-android"
+    ,   ["riscv64"]     = "riscv64-linux-android"
+    ,   i386            = "i686-linux-android"      -- deprecated
+    ,   x86             = "i686-linux-android"
+    ,   x86_64          = "x86_64-linux-android"
+    ,   mips            = "mips-linux-android"      -- removed in ndk r17
+    ,   mips64          = "mips64-linux-android"    -- removed in ndk r17
+    }
+    return triples[arch]
+end
+
+-- get target
+function _get_target(arch, ndk_sdkver)
+    local targets =
+    {
+        ["armv5te"]     = "armv5te-none-linux-androideabi"  -- deprecated
+    ,   ["armeabi"]     = "armv5te-none-linux-androideabi"  -- removed in ndk r17
+    ,   ["armv7-a"]     = "armv7-none-linux-androideabi"    -- deprecated
+    ,   ["armeabi-v7a"] = "armv7-none-linux-androideabi"
+    ,   ["arm64-v8a"]   = "aarch64-none-linux-android"
+    ,   ["riscv64"]     = "riscv64-none-linux-android"
+    ,   ["i386"]        = "i686-none-linux-android"         -- deprecated
+    ,   ["x86"]         = "i686-none-linux-android"
+    ,   ["x86_64"]      = "x86_64-none-linux-android"
+    ,   ["mips"]        = "mipsel-none-linux-android"       -- removed in ndk r17
+    ,   ["mips64"]      = "mips64el-none-linux-android"     -- removed in ndk r17
+    }
+    assert(targets[arch], "unknown arch(%s) for android!", arch)
+    return targets[arch] .. (ndk_sdkver or "")
+end
 
 -- load ndk toolchain
 --
@@ -30,14 +70,19 @@ import("core.project.config")
 function main(toolchain)
 
     -- get cross
-    local cross = config.get("cross") or ""
+    local cross = toolchain:cross() or ""
 
     -- get gcc toolchain bin directory
     local gcc_toolchain_bin = nil
-    local gcc_toolchain = config.get("gcc_toolchain")
+    local gcc_toolchain = toolchain:config("gcc_toolchain")
     if gcc_toolchain then
         gcc_toolchain_bin = path.join(gcc_toolchain, "bin")
     end
+
+    -- get ndk and version
+    local ndk = toolchain:config("ndk")
+    local ndkver = toolchain:config("ndkver")
+    local ndk_sdkver = toolchain:config("ndk_sdkver")
 
     -- set toolset
     toolchain:set("toolset", "cc", "clang", cross .. "gcc")
@@ -47,9 +92,15 @@ function main(toolchain)
     toolchain:set("toolset", "ld", "clang++", "clang", cross .. "g++", cross .. "gcc")
     toolchain:set("toolset", "sh", "clang++", "clang", cross .. "g++", cross .. "gcc")
     toolchain:set("toolset", "ar", gcc_toolchain_bin and path.join(gcc_toolchain_bin, cross .. "ar") or (cross .. "ar"), "llvm-ar")
-    toolchain:set("toolset", "ex", gcc_toolchain_bin and path.join(gcc_toolchain_bin, cross .. "ar") or (cross .. "ar"), "llvm-ar")
     toolchain:set("toolset", "ranlib", gcc_toolchain_bin and path.join(gcc_toolchain_bin, cross .. "ranlib") or (cross .. "ranlib"))
-    toolchain:set("toolset", "strip", gcc_toolchain_bin and path.join(gcc_toolchain_bin, cross .. "strip") or (cross .. "strip"))
+    toolchain:set("toolset", "strip", gcc_toolchain_bin and path.join(gcc_toolchain_bin, cross .. "strip") or (cross .. "strip"), "llvm-strip")
+
+    -- gnustl and stlport have been removed in ndk r18 (deprecated in ndk r17)
+    -- https://github.com/android/ndk/wiki/Changelog-r18
+    local old_runtimes = {"gnustl_static", "gnustl_shared", "stlport_static", "stlport_shared"}
+    if ndkver and ndkver < 18 then
+        toolchain:add("runtimes", table.unpack(old_runtimes))
+    end
 
     -- init flags
     local arm32 = false
@@ -62,7 +113,7 @@ function main(toolchain)
 
     -- use llvm directory? e.g. android-ndk/toolchains/llvm/prebuilt/darwin-x86_64/bin
     local isllvm = false
-    local bindir = config.get("bin")
+    local bindir = toolchain:bindir()
     if bindir and bindir:find("llvm", 1, true) then
         isllvm = true
     end
@@ -70,33 +121,20 @@ function main(toolchain)
     -- init architecture
     if isllvm then
 
-        -- add target
-        local targets =
-        {
-            ["armv5te"]     = "armv5te-none-linux-androideabi"  -- deprecated
-        ,   ["armeabi"]     = "armv5te-none-linux-androideabi"  -- removed in ndk r17
-        ,   ["armv7-a"]     = "armv7-none-linux-androideabi"    -- deprecated
-        ,   ["armeabi-v7a"] = "armv7-none-linux-androideabi"
-        ,   ["arm64-v8a"]   = "aarch64-none-linux-android"
-        ,   ["i386"]        = "i686-none-linux-android"         -- deprecated
-        ,   ["x86"]         = "i686-none-linux-android"
-        ,   ["x86_64"]      = "x86_64-none-linux-android"
-        ,   ["mips"]        = "mipsel-none-linux-android"       -- removed in ndk r17
-        ,   ["mips64"]      = "mips64el-none-linux-android"     -- removed in ndk r17
-        }
-        assert(targets[arch], "unknown arch(%s) for android!", arch)
-        toolchain:add("cxflags", "-target " .. targets[arch])
-        toolchain:add("asflags", "-target " .. targets[arch])
-        toolchain:add("ldflags", "-target " .. targets[arch])
-        toolchain:add("shflags", "-target " .. targets[arch])
+        -- add ndk target
+        local ndk_target = _get_target(arch, ndk_sdkver)
+        toolchain:add("cxflags", "--target=" .. ndk_target)
+        toolchain:add("asflags", "--target=" .. ndk_target)
+        toolchain:add("ldflags", "--target=" .. ndk_target)
+        toolchain:add("shflags", "--target=" .. ndk_target)
 
         -- add gcc toolchain
-        local gcc_toolchain = config.get("gcc_toolchain")
+        local gcc_toolchain = toolchain:config("gcc_toolchain")
         if gcc_toolchain then
-            toolchain:add("cxflags", "-gcc-toolchain " .. gcc_toolchain)
-            toolchain:add("asflags", "-gcc-toolchain " .. gcc_toolchain)
-            toolchain:add("ldflags", "-gcc-toolchain " .. gcc_toolchain)
-            toolchain:add("shflags", "-gcc-toolchain " .. gcc_toolchain)
+            toolchain:add("cxflags", "--gcc-toolchain=" .. gcc_toolchain)
+            toolchain:add("asflags", "--gcc-toolchain=" .. gcc_toolchain)
+            toolchain:add("ldflags", "--gcc-toolchain=" .. gcc_toolchain)
+            toolchain:add("shflags", "--gcc-toolchain=" .. gcc_toolchain)
         end
     else
         local march = arch
@@ -116,9 +154,6 @@ function main(toolchain)
     toolchain:add("binary.cxflags", "-fPIE", "-pie")
 
     -- add flags for the sdk directory of ndk
-    local ndk = config.get("ndk")
-    local ndkver = config.get("ndkver")
-    local ndk_sdkver = config.get("ndk_sdkver")
     if ndk and ndk_sdkver then
 
         -- the sysroot archs
@@ -129,6 +164,7 @@ function main(toolchain)
         ,   ["armeabi"]     = "arch-arm"    -- removed in ndk r17
         ,   ["armeabi-v7a"] = "arch-arm"
         ,   ["arm64-v8a"]   = "arch-arm64"
+        ,   ["riscv64"]     = "arch-riscv64"
         ,   i386            = "arch-x86"    -- deprecated
         ,   x86             = "arch-x86"
         ,   x86_64          = "arch-x86_64"
@@ -137,58 +173,34 @@ function main(toolchain)
         }
         local sysroot_arch = sysroot_archs[arch]
 
-        -- add sysroot
-        --
-        -- @see https://android.googlesource.com/platform/ndk/+/master/docs/UnifiedHeaders.md
-        --
-        -- Before NDK r14, we had a set of libc headers for each API version.
-        -- In many cases these headers were incorrect. Many exposed APIs that didn‘t exist, and others didn’t expose APIs that did.
-        --
-        -- In NDK r14 (as an opt in feature) we unified these into a single set of headers, called unified headers.
-        -- This single header path is used for every platform level. API level guards are handled with #ifdef.
-        -- These headers can be found in prebuilts/ndk/headers.
-        --
-        -- Unified headers are built directly from the Android platform, so they are up to date and correct (or at the very least,
-        -- any bugs in the NDK headers will also be a bug in the platform headers, which means we're much more likely to find them).
-        --
-        -- In r15 unified headers are used by default. In r16, the old headers have been removed.
-        --
-        local ndk_sdkdir = path.translate(format("%s/platforms/android-%d", ndk, ndk_sdkver))
-        local ndk_sysroot_be_r14 = path.join(ndk, "sysroot")
-        if os.isdir(ndk_sysroot_be_r14) then
-
-            -- the triples
-            local triples =
-            {
-                ["armv5te"]     = "arm-linux-androideabi"   -- deprecated
-            ,   ["armv7-a"]     = "arm-linux-androideabi"   -- deprecated
-            ,   ["armeabi"]     = "arm-linux-androideabi"   -- removed in ndk r17
-            ,   ["armeabi-v7a"] = "arm-linux-androideabi"
-            ,   ["arm64-v8a"]   = "aarch64-linux-android"
-            ,   i386            = "i686-linux-android"      -- deprecated
-            ,   x86             = "i686-linux-android"
-            ,   x86_64          = "x86_64-linux-android"
-            ,   mips            = "mips-linux-android"      -- removed in ndk r17
-            ,   mips64          = "mips64-linux-android"    -- removed in ndk r17
-            }
-            toolchain:add("cxflags", "-D__ANDROID_API__=" .. ndk_sdkver)
-            toolchain:add("asflags", "-D__ANDROID_API__=" .. ndk_sdkver)
-            toolchain:add("cflags",  "--sysroot=" .. ndk_sysroot_be_r14)
-            toolchain:add("cxxflags","--sysroot=" .. ndk_sysroot_be_r14)
-            toolchain:add("asflags", "--sysroot=" .. ndk_sysroot_be_r14)
-            toolchain:add("cflags",  "-isystem " .. path.join(ndk_sysroot_be_r14, "usr", "include", triples[arch]))
-            toolchain:add("cxxflags","-isystem " .. path.join(ndk_sysroot_be_r14, "usr", "include", triples[arch]))
-            toolchain:add("asflags", "-isystem " .. path.join(ndk_sysroot_be_r14, "usr", "include", triples[arch]))
-        else
-            if sysroot_arch then
-                toolchain:add("cflags",   format("--sysroot=%s/%s", ndk_sdkdir, sysroot_arch))
-                toolchain:add("cxxflags", format("--sysroot=%s/%s", ndk_sdkdir, sysroot_arch))
-                toolchain:add("asflags",  format("--sysroot=%s/%s", ndk_sdkdir, sysroot_arch))
+        -- add sysroot flags
+        local ndk_sysroot = toolchain:config("ndk_sysroot")
+        if ndk_sysroot and os.isdir(ndk_sysroot) then
+            local triple = _get_triple(arch)
+            if ndkver and tonumber(ndkver) < 22 then
+                toolchain:add("cxflags", "-D__ANDROID_API__=" .. ndk_sdkver)
+                toolchain:add("asflags", "-D__ANDROID_API__=" .. ndk_sdkver)
             end
-        end
-        if sysroot_arch then
-            toolchain:add("ldflags", format("--sysroot=%s/%s", ndk_sdkdir, sysroot_arch))
-            toolchain:add("shflags", format("--sysroot=%s/%s", ndk_sdkdir, sysroot_arch))
+            local flag_sysroot = "--sysroot=" .. os.args(ndk_sysroot)
+            local flag_isystem = "-isystem " .. os.args(path.join(ndk_sysroot, "usr", "include", triple))
+            toolchain:add("cflags",   flag_sysroot)
+            toolchain:add("cxxflags", flag_sysroot)
+            toolchain:add("asflags",  flag_sysroot)
+            toolchain:add("cflags",   flag_isystem)
+            toolchain:add("cxxflags", flag_isystem)
+            toolchain:add("asflags",  flag_isystem)
+        else
+            local ndk_sdkdir = path.translate(format("%s/platforms/android-%d", ndk, ndk_sdkver))
+            if os.isdir(ndk_sdkdir) then
+                if sysroot_arch then
+                    local flag_sysroot = "--sysroot=" .. os.args(path.join(ndk_sdkdir, sysroot_arch))
+                    toolchain:add("cflags",   flag_sysroot)
+                    toolchain:add("cxxflags", flag_sysroot)
+                    toolchain:add("asflags",  flag_sysroot)
+                    toolchain:add("ldflags",  flag_sysroot)
+                    toolchain:add("shflags",  flag_sysroot)
+                end
+            end
         end
 
         -- add "-fPIE -pie" to ldflags
@@ -200,8 +212,8 @@ function main(toolchain)
 
         -- get gnu c++ stl sdk directory
         local cxxstl_sdkdir_gnustl = nil
-        if config.get("ndk_toolchains_ver") then
-            cxxstl_sdkdir_gnustl = path.translate(format("%s/sources/cxx-stl/gnu-libstdc++/%s", ndk, config.get("ndk_toolchains_ver")))
+        if toolchain:config("ndk_toolchains_ver") then
+            cxxstl_sdkdir_gnustl = path.translate(format("%s/sources/cxx-stl/gnu-libstdc++/%s", ndk, toolchain:config("ndk_toolchains_ver")))
         end
 
         -- get stlport c++ sdk directory
@@ -209,8 +221,21 @@ function main(toolchain)
 
         -- get c++ stl sdk directory
         local cxxstl_sdkdir = nil
-        local ndk_cxxstl = config.get("ndk_cxxstl")
+        local ndk_cxxstl = config.get("runtimes") or config.get("ndk_cxxstl")
         if ndk_cxxstl then
+            if (ndkver and ndkver >= 18) and table.contains(old_runtimes, ndk_cxxstl)  then
+                utils.warning("%s is was removed in ndk v%s", ndk_cxxstl, ndk_sdkver)
+            end
+
+            if ndk_cxxstl:find(",", 1, true) then
+                local runtimes_supported = hashset.from(toolchain:get("runtimes"))
+                for _, item in ipairs(ndk_cxxstl:split(",")) do
+                    if runtimes_supported:has(item) then
+                        ndk_cxxstl = item
+                        break
+                    end
+                end
+            end
             -- we uses c++_static/c++_shared instead of llvmstl_static/llvmstl_shared
             if ndk_cxxstl:startswith("c++") or ndk_cxxstl:startswith("llvmstl") then
                 cxxstl_sdkdir = cxxstl_sdkdir_llvmstl
@@ -231,76 +256,96 @@ function main(toolchain)
         end
 
         -- only for c++ stl
-        if config.get("ndk_stdcxx") and cxxstl_sdkdir and os.isdir(cxxstl_sdkdir) then
+        if config.get("ndk_stdcxx") then
+            if cxxstl_sdkdir and os.isdir(cxxstl_sdkdir) then
 
-            -- the toolchains archs
-            local toolchains_archs =
-            {
-                ["armv5te"]     = "armeabi"         -- deprecated
-            ,   ["armv7-a"]     = "armeabi-v7a"     -- deprecated
-            ,   ["armeabi"]     = "armeabi"         -- removed in ndk r17
-            ,   ["armeabi-v7a"] = "armeabi-v7a"
-            ,   ["arm64-v8a"]   = "arm64-v8a"
-            ,   i386            = "x86"             -- deprecated
-            ,   x86             = "x86"
-            ,   x86_64          = "x86_64"
-            ,   mips            = "mips"            -- removed in ndk r17
-            ,   mips64          = "mips64"          -- removed in ndk r17
-            }
-            local toolchains_arch = toolchains_archs[arch]
+                -- the toolchains archs
+                local toolchains_archs =
+                {
+                    ["armv5te"]     = "armeabi"         -- deprecated
+                ,   ["armv7-a"]     = "armeabi-v7a"     -- deprecated
+                ,   ["armeabi"]     = "armeabi"         -- removed in ndk r17
+                ,   ["armeabi-v7a"] = "armeabi-v7a"
+                ,   ["arm64-v8a"]   = "arm64-v8a"
+                ,   ["riscv64"]     = "riscv64"
+                ,   i386            = "x86"             -- deprecated
+                ,   x86             = "x86"
+                ,   x86_64          = "x86_64"
+                ,   mips            = "mips"            -- removed in ndk r17
+                ,   mips64          = "mips64"          -- removed in ndk r17
+                }
+                local toolchains_arch = toolchains_archs[arch]
 
-            -- add c++ stl include and link directories
-            if toolchains_arch then
-                toolchain:add("linkdirs", format("%s/libs/%s", cxxstl_sdkdir, toolchains_arch))
-            end
-            if ndk_cxxstl:startswith("c++") or ndk_cxxstl:startswith("llvmstl") then
-                toolchain:add("sysincludedirs", format("%s/include", cxxstl_sdkdir))
+                -- add c++ stl include and link directories
                 if toolchains_arch then
-                    toolchain:add("sysincludedirs", format("%s/libs/%s/include", cxxstl_sdkdir, toolchains_arch))
+                    toolchain:add("linkdirs", format("%s/libs/%s", cxxstl_sdkdir, toolchains_arch))
                 end
-                local abi_path = path.join(ndk, "sources", "cxx-stl", "llvm-libc++abi")
-                local before_r13 = path.join(abi_path, "libcxxabi")
-                local after_r13 = path.join(abi_path, "include")
-                if os.isdir(before_r13) then
-                    toolchain:add("sysincludedirs", before_r13)
-                elseif os.isdir(after_r13) then
-                    toolchain:add("sysincludedirs", after_r13)
+                if ndk_cxxstl:startswith("c++") or ndk_cxxstl:startswith("llvmstl") then
+                    toolchain:add("cxxflags", "-nostdinc++")
+                    toolchain:add("sysincludedirs", format("%s/include", cxxstl_sdkdir))
+                    if toolchains_arch then
+                        toolchain:add("sysincludedirs", format("%s/libs/%s/include", cxxstl_sdkdir, toolchains_arch))
+                    end
+                    local abi_path = path.join(ndk, "sources", "cxx-stl", "llvm-libc++abi")
+                    local before_r13 = path.join(abi_path, "libcxxabi")
+                    local after_r13 = path.join(abi_path, "include")
+                    if os.isdir(before_r13) then
+                        toolchain:add("sysincludedirs", before_r13)
+                    elseif os.isdir(after_r13) then
+                        toolchain:add("sysincludedirs", after_r13)
+                    end
+                elseif ndk_cxxstl:startswith("gnustl") then
+                    toolchain:add("cxxflags", "-nostdinc++")
+                    toolchain:add("sysincludedirs", format("%s/include", cxxstl_sdkdir))
+                    if toolchains_arch then
+                        toolchain:add("sysincludedirs", format("%s/libs/%s/include", cxxstl_sdkdir, toolchains_arch))
+                    end
+                elseif ndk_cxxstl:startswith("stlport") then
+                    toolchain:add("cxxflags", "-nostdinc++")
+                    toolchain:add("sysincludedirs", format("%s/stlport", cxxstl_sdkdir))
                 end
-            elseif ndk_cxxstl:startswith("gnustl") then
-                toolchain:add("sysincludedirs", format("%s/include", cxxstl_sdkdir))
-                if toolchains_arch then
-                    toolchain:add("sysincludedirs", format("%s/libs/%s/include", cxxstl_sdkdir, toolchains_arch))
-                end
-            elseif ndk_cxxstl:startswith("stlport") then
-                toolchain:add("sysincludedirs", format("%s/stlport", cxxstl_sdkdir))
-            end
 
-            -- add c++ stl links
-            if ndk_cxxstl == "c++_static" or ndk_cxxstl == "llvmstl_static" then
-                toolchain:add("syslinks", "c++_static", "c++abi")
-                if arm32 then
-                    toolchain:add("syslinks", "unwind", "atomic")
+                -- add c++ stl links
+                if ndk_cxxstl == "c++_static" or ndk_cxxstl == "llvmstl_static" then
+                    toolchain:add("syslinks", "c++_static", "c++abi")
+                    if arm32 then
+                        toolchain:add("syslinks", "unwind", "atomic")
+                    end
+                elseif ndk_cxxstl == "c++_shared" or ndk_cxxstl == "llvmstl_shared" then
+                    toolchain:add("syslinks", "c++_shared", "c++abi")
+                    if arm32 then
+                        toolchain:add("syslinks", "unwind", "atomic")
+                    end
+                elseif ndk_cxxstl == "gnustl_static" then
+                    toolchain:add("syslinks", "gnustl_static")
+                elseif ndk_cxxstl == "gnustl_shared" then
+                    toolchain:add("syslinks", "gnustl_shared")
+                elseif ndk_cxxstl == "stlport_static" then
+                    toolchain:add("syslinks", "stlport_static")
+                elseif ndk_cxxstl == "stlport_shared" then
+                    toolchain:add("syslinks", "stlport_shared")
                 end
-            elseif ndk_cxxstl == "c++_shared" or ndk_cxxstl == "llvmstl_shared" then
-                toolchain:add("syslinks", "c++_shared", "c++abi")
-                if arm32 then
-                    toolchain:add("syslinks", "unwind", "atomic")
-                end
-            elseif ndk_cxxstl == "gnustl_static" then
-                toolchain:add("syslinks", "gnustl_static")
-            elseif ndk_cxxstl == "gnustl_shared" then
-                toolchain:add("syslinks", "gnustl_shared")
-            elseif ndk_cxxstl == "stlport_static" then
-                toolchain:add("syslinks", "stlport_static")
-            elseif ndk_cxxstl == "stlport_shared" then
-                toolchain:add("syslinks", "stlport_shared")
-            end
 
-            -- fix 'ld: error: cannot find -lc++' for clang++.exe on r20/windows
-            -- @see https://github.com/xmake-io/xmake/issues/684
-            if ndkver and ndkver >= 20 and (ndk_cxxstl:startswith("c++") or ndk_cxxstl:startswith("llvmstl")) then
-                toolchain:add("ldflags", "-nostdlib++")
-                toolchain:add("shflags", "-nostdlib++")
+                -- fix 'ld: error: cannot find -lc++' for clang++.exe on r20/windows
+                -- @see https://github.com/xmake-io/xmake/issues/684
+                if ndkver and ndkver >= 20 and (ndk_cxxstl:startswith("c++") or ndk_cxxstl:startswith("llvmstl")) then
+                    toolchain:add("ldflags", "-nostdlib++")
+                    toolchain:add("shflags", "-nostdlib++")
+                end
+            elseif ndkver and ndkver >= 26 then
+                -- The NDK's libc++ now comes directly from our LLVM toolchain above 26b
+                -- https://github.com/xmake-io/xmake/issues/4614
+                if ndk_cxxstl == "c++_static" then
+                    toolchain:add("ldflags", "-static-libstdc++", "-lc++abi")
+                    toolchain:add("shflags", "-static-libstdc++", "-lc++abi")
+                    if arm32 then
+                        toolchain:add("syslinks", "unwind", "atomic")
+                    end
+                elseif ndk_cxxstl == "c++_shared" then
+                    if arm32 then
+                        toolchain:add("syslinks", "unwind", "atomic")
+                    end
+                end
             end
         end
     end
@@ -321,20 +366,6 @@ function main(toolchain)
     toolchain:add("target.on_ldflags", target_on_xxflags)
     toolchain:add("target.on_shflags", target_on_xxflags)
 
-    -- init targets for rust
-    local targets_rust =
-    {
-        ["armv5te"]     = "arm-linux-androideabi" -- deprecated
-    ,   ["armv7-a"]     = "arm-linux-androideabi" -- deprecated
-    ,   ["armeabi"]     = "arm-linux-androideabi" -- removed in ndk r17
-    ,   ["armeabi-v7a"] = "arm-linux-androideabi"
-    ,   ["arm64-v8a"]   = "aarch64-linux-android"
-    }
-
-    -- init flags for rust
-    if targets_rust[arch] then
-        toolchain:add("rcflags", "--target=" .. targets_rust[arch])
-    end
     local rcshflags = table.copy(toolchain:get("shflags"))
     local rcldflags = table.copy(toolchain:get("ldflags"))
     for _, link in ipairs(toolchain:get("syslinks")) do
@@ -343,7 +374,7 @@ function main(toolchain)
     end
     toolchain:add("rcshflags", "-C link-args=\"" .. (table.concat(rcshflags, " "):gsub("%-march=.-%s", "") .. "\""))
     toolchain:add("rcldflags", "-C link-args=\"" .. (table.concat(rcldflags, " "):gsub("%-march=.-%s", "") .. "\""))
-    local sh = toolchain:tool("sh") -- @note we cannot use `config.get("sh")`, because we need check sh first
+    local sh = toolchain:tool("sh") -- @note we cannot use `config.get("sh")`, because we need to check sh first
     if sh then
         toolchain:add("rcshflags", "-C linker=" .. sh)
     end

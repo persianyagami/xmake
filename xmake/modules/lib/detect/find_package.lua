@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_package.lua
@@ -21,8 +21,9 @@
 -- imports
 import("core.base.option")
 import("core.project.config")
-import("lib.detect.cache")
+import("core.cache.detectcache")
 import("package.manager.find_package")
+import("private.utils.package", {alias = "package_utils"})
 
 -- find package using the package manager
 --
@@ -56,23 +57,28 @@ function main(name, opt)
     opt.mode = opt.mode or config.mode() or "release"
 
     -- init cache key
-    local key = "find_package_" .. opt.plat .. "_" .. opt.arch
-    if opt.require_version then
-        key = key .. "_" .. opt.require_version
-    end
+    local cachekey = "find_package_" .. opt.plat .. "_" .. opt.arch
     if opt.cachekey then
-        key = key .. "_" .. opt.cachekey
+        cachekey = cachekey .. "_" .. opt.cachekey
+    end
+
+    -- init package key
+    local packagekey = name
+    if opt.buildhash then
+        packagekey = packagekey .. "_" .. opt.buildhash
     end
     if opt.mode then
-        key = key .. "_" .. opt.mode
+        packagekey = packagekey .. "_" .. opt.mode
+    end
+    if opt.require_version then
+        packagekey = packagekey .. "_" .. opt.require_version
     end
     if opt.external then
-        key = key .. "_external"
+        packagekey = packagekey .. "_external"
     end
 
     -- attempt to get result from cache first
-    local cacheinfo = cache.load(key)
-    local result = cacheinfo[name]
+    local result = detectcache:get2(cachekey, packagekey)
     if result == nil or opt.force then
 
         -- find package
@@ -83,11 +89,16 @@ function main(name, opt)
         if result and result.includedirs and opt.external then
             result.sysincludedirs = result.includedirs
             result.includedirs = nil
+            local components_base = result.components and result.components.__base
+            if components_base then
+                components_base.sysincludedirs = components_base.includedirs
+                components_base.includedirs = nil
+            end
         end
 
         -- cache result
-        cacheinfo[name] = result and result or false
-        cache.save(key, cacheinfo)
+        detectcache:set2(cachekey, packagekey, result and result or false)
+        detectcache:save()
 
         -- trace
         if opt.verbose or option.get("verbose") then
@@ -107,6 +118,11 @@ function main(name, opt)
     -- does not show version (default)? strip it
     if not opt.version and result then
         result.version = nil
+    end
+
+    -- register concat
+    if result then
+        package_utils.fetchinfo_set_concat(result)
     end
     return result and result or nil
 end

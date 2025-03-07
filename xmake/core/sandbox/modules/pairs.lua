@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        pairs.lua
@@ -25,14 +25,18 @@ local table = require("base/table")
 function sandbox_pairs(t)
 
     -- exists the custom ipairs?
-    if type(t) == "table" and t.pairs then
+    local is_table = type(t) == "table"
+    if is_table and t.pairs then
         return t:pairs()
     end
 
     -- wrap table and return iterator
+    if not is_table then
+        t = t ~= nil and {t} or {}
+    end
     return function (t, i)
         return next(t, i)
-    end, table.wrap(t), nil
+    end, t, nil
 end
 
 -- load module

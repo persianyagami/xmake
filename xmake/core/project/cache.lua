@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        cache.lua
@@ -67,7 +67,7 @@ function cache._instance(scopename)
     -- make the cache path
     local cachepath = (scopename:gsub("%.", "/"))
     cachepath = (cachepath:gsub("^local%/", path.join(config.directory(), "cache") .. "/"))
-    cachepath = (cachepath:gsub("^global%/", path.join(global.directory(), "cache") .. "/"))
+    cachepath = (cachepath:gsub("^global%/", path.join(global.cachedir()) .. "/"))
 
     -- save the cache path
     instance._CACHEPATH = cachepath

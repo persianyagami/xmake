@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        os.lua
@@ -27,26 +27,28 @@ local interpreter   = require("base/interpreter")
 local sandbox_os = sandbox_os or {}
 
 -- export some readonly interfaces
-sandbox_os.host        = os.host
-sandbox_os.arch        = os.arch
-sandbox_os.subhost     = os.subhost
-sandbox_os.subarch     = os.subarch
-sandbox_os.date        = os.date
-sandbox_os.time        = os.time
-sandbox_os.mtime       = os.mtime
-sandbox_os.mclock      = os.mclock
-sandbox_os.getenv      = os.getenv
-sandbox_os.isdir       = os.isdir
-sandbox_os.isfile      = os.isfile
-sandbox_os.exists      = os.exists
-sandbox_os.curdir      = os.curdir
-sandbox_os.tmpdir      = os.tmpdir
-sandbox_os.cpuinfo     = os.cpuinfo
-sandbox_os.filesize    = os.filesize
-sandbox_os.programdir  = os.programdir
-sandbox_os.programfile = os.programfile
-sandbox_os.projectdir  = os.projectdir
-sandbox_os.projectfile = os.projectfile
+sandbox_os.term         = os.term
+sandbox_os.host         = os.host
+sandbox_os.arch         = os.arch
+sandbox_os.subhost      = os.subhost
+sandbox_os.subarch      = os.subarch
+sandbox_os.date         = os.date
+sandbox_os.time         = os.time
+sandbox_os.mtime        = os.mtime
+sandbox_os.mclock       = os.mclock
+sandbox_os.getenv       = os.getenv
+sandbox_os.isdir        = os.isdir
+sandbox_os.isfile       = os.isfile
+sandbox_os.exists       = os.exists
+sandbox_os.curdir       = os.curdir
+sandbox_os.tmpdir       = os.tmpdir
+sandbox_os.cpuinfo      = os.cpuinfo
+sandbox_os.default_njob = os.default_njob
+sandbox_os.filesize     = os.filesize
+sandbox_os.programdir   = os.programdir
+sandbox_os.programfile  = os.programfile
+sandbox_os.projectdir   = os.projectdir
+sandbox_os.projectfile  = os.projectfile
 
 -- match files
 function sandbox_os.files(pattern, ...)
@@ -65,12 +67,8 @@ end
 
 -- get the script directory
 function sandbox_os.scriptdir()
-
-    -- get the current interpreter instance
     local instance = interpreter.instance()
     assert(instance)
-
-    -- get the script directory
     return instance:scriptdir()
 end
 

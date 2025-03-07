@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      OpportunityLiu, ruki
  * @file        file_close.c
@@ -52,7 +52,7 @@ tb_int_t xm_io_file_close(lua_State* lua)
     if (xm_io_file_is_file(file))
     {
         // check
-        tb_assert(file->file_ref);
+        tb_assert(file->u.file_ref);
 
 #ifdef TB_CONFIG_OS_WINDOWS
         // write cached data first
@@ -60,14 +60,20 @@ tb_int_t xm_io_file_close(lua_State* lua)
         tb_size_t        osize = tb_buffer_size(&file->wcache);
         if (odata && osize)
         {
-            if (!tb_stream_bwrit(file->file_ref, odata, osize)) return tb_false;
+            if (!tb_stream_bwrit(file->u.file_ref, odata, osize)) return tb_false;
             tb_buffer_clear(&file->wcache);
         }
 #endif
 
+        // flush filter stream cache, TODO we should fix it in tbox/stream
+        if ((file->mode & TB_FILE_MODE_RW) == TB_FILE_MODE_RW && file->fstream)
+        {
+            if (!tb_stream_sync(file->u.file_ref, tb_false)) return tb_false;
+        }
+
         // close file
-        tb_stream_clos(file->file_ref);
-        file->file_ref = tb_null;
+        tb_stream_clos(file->u.file_ref);
+        file->u.file_ref = tb_null;
 
         // exit fstream
         if (file->fstream) tb_stream_exit(file->fstream);

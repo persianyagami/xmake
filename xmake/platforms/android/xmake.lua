@@ -12,19 +12,14 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define platform
 platform("android")
-
-    -- set os
     set_os("android")
-
-    -- set hosts
     set_hosts("macosx", "linux", "windows")
 
     -- set archs, we use the latest android abi provided in android ndk now.
@@ -34,28 +29,15 @@ platform("android")
     -- @see https://developer.android.google.cn/ndk/guides/abis
     -- @note The NDK previously supported ARMv5 (armeabi) and 32-bit and 64-bit MIPS, but this support has been removed in NDK r17.
     --
-    set_archs("armeabi", "armeabi-v7a", "arm64-v8a", "x86", "x86_64", "mips", "mip64")
+    set_archs("armeabi", "armeabi-v7a", "arm64-v8a", "riscv64", "x86", "x86_64", "mips", "mip64")
 
-    -- set formats
     set_formats("static", "lib$(name).a")
     set_formats("object", "$(name).o")
     set_formats("shared", "lib$(name).so")
     set_formats("symbol", "$(name).sym")
 
-    -- on check
-    on_check(function (platform)
-        import("core.project.config")
-        local arch = config.get("arch")
-        if not arch then
-            config.set("arch", "armeabi-v7a")
-            cprint("checking for architecture ... ${color.success}%s", config.get("arch"))
-        end
-    end)
-
-    -- set toolchains
     set_toolchains("envs", "ndk", "rust")
 
-    -- set menu
     set_menu {
                 config =
                 {
@@ -65,7 +47,7 @@ platform("android")
                 ,   {nil, "android_sdk",    "kv", nil,          "The Android SDK Directory"             }
                 ,   {nil, "build_toolver",  "kv", nil,          "The Build Tool Version of Android SDK" }
                 ,   {nil, "ndk_stdcxx",     "kv", true,         "Use stdc++ library for NDK"            }
-                ,   {nil, "ndk_cxxstl",     "kv", nil,          "The stdc++ stl library for NDK",
+                ,   {nil, "ndk_cxxstl",     "kv", nil,          "The stdc++ stl library for NDK, (deprecated, please use --runtimes)",
                                                                 "    - c++_static",
                                                                 "    - c++_shared",
                                                                 "    - gnustl_static",

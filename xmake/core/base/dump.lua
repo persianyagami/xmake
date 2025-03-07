@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      OpportunityLiu
 -- @file        dump.lua
@@ -196,7 +196,7 @@ function dump._print_udata(value, first_indent, remain_indent, printed_set)
     io.write(first_indent)
 
     if not first_level then
-        return dump._print_udata_scalar(value)
+        io.write(todisplay._print_udata_scalar(value))
     end
     local inner_indent = remain_indent .. "  "
 

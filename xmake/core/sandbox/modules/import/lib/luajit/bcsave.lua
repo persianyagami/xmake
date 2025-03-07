@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        bcsave.lua
@@ -22,6 +22,10 @@
 local io        = require("base/io")
 local string    = require("base/string")
 local raise     = require("sandbox/modules/raise")
+
+if not xmake._LUAJIT then
+    return
+end
 
 -- save lua file to bitcode file
 --
@@ -44,4 +48,5 @@ function main(luafile, bcfile, opt)
         raise(errors)
     end
 end
+
 return main

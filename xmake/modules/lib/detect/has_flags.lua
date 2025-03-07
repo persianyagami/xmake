@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        has_flags.lua
@@ -21,8 +21,9 @@
 -- imports
 import("core.base.option")
 import("core.base.scheduler")
+import("core.base.profiler")
 import("core.project.config")
-import("lib.detect.cache")
+import("core.cache.detectcache")
 import("lib.detect.find_tool")
 
 -- has the given flags for the current tool?
@@ -43,6 +44,8 @@ import("lib.detect.find_tool")
 function main(name, flags, opt)
 
     -- wrap flags first
+    flags = table.clone(flags)
+    table.wrap_unlock(flags)
     flags = table.wrap(flags)
 
     -- init options
@@ -73,20 +76,25 @@ function main(name, flags, opt)
     local arch = opt.arch or config.get("arch") or os.arch()
 
     -- init cache key
-    local key = plat .. "_" .. arch .. "_" .. tool.program .. "_" .. (tool.version or "") .. "_" .. (opt.toolkind or "") .. "_" .. (opt.flagkind or "") .. "_" .. table.concat(opt.sysflags, " ") .. "_" .. opt.flagskey
+    local key = plat .. "_" .. arch .. "_" .. tool.program .. "_"
+              .. (tool.version or "") .. "_" .. (opt.toolkind or "")
+              .. "_" .. (opt.flagkind or "") .. "_" .. table.concat(opt.sysflags, " ") .. "_" .. opt.flagskey
 
-    -- @note avoid detect the same program in the same time if running in the coroutine (e.g. ccache)
-    local coroutine_running = scheduler.co_running()
-    if coroutine_running then
-        while _g._checking ~= nil and _g._checking == key do
-            scheduler.co_yield()
-        end
-    end
+    -- @see https://github.com/xmake-io/xmake/issues/4645
+    -- @note avoid detect the same program in the same time leading to deadlock if running in the coroutine (e.g. ccache)
+    scheduler.co_lock(key)
 
     -- attempt to get result from cache first
-    local cacheinfo = cache.load("lib.detect.has_flags")
+    local cacheinfo = detectcache:get("lib.detect.has_flags")
+    if not cacheinfo then
+        -- since has_flags may be switched to other concurrent processes during cache saving,
+        -- we need to commit the initialized cache to avoid multiple cache objects overwriting it.
+        cacheinfo = {}
+        detectcache:set("lib.detect.has_flags", cacheinfo)
+    end
     local result = cacheinfo[key]
     if result ~= nil and not opt.force then
+        scheduler.co_unlock(key)
         return result
     end
 
@@ -107,9 +115,11 @@ function main(name, flags, opt)
     end
     checkflags = results
 
-    -- detect.tools.xxx.has_flags(flags, opt)?
-    _g._checking = coroutine_running and key or nil
-    local hasflags = import("detect.tools." .. tool.name .. ".has_flags", {try = true})
+    -- start profile
+    profiler.enter("has_flags", tool.name, checkflags[1])
+
+    -- core.tools.xxx.has_flags(flags, opt)?
+    local hasflags = import("core.tools." .. tool.name .. ".has_flags", {try = true})
     local errors = nil
     if hasflags then
         result, errors = hasflags(checkflags, opt)
@@ -119,8 +129,10 @@ function main(name, flags, opt)
     if opt.on_check then
         result, errors = opt.on_check(result, errors)
     end
-    _g._checking = nil
     result = result or false
+
+    -- stop profile
+    profiler.leave("has_flags", tool.name, checkflags[1])
 
     -- trace
     if option.get("verbose") or option.get("diagnosis") or opt.verbose then
@@ -137,7 +149,9 @@ function main(name, flags, opt)
 
     -- save result to cache
     cacheinfo[key] = result
-    cache.save("lib.detect.has_flags", cacheinfo)
+    detectcache:set("lib.detect.has_flags", cacheinfo)
+    detectcache:save()
+    scheduler.co_unlock(key)
     return result
 end
 

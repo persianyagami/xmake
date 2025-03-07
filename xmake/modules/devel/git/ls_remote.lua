@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        ls_remote.lua
@@ -58,7 +58,7 @@ function main(reftype, url)
 
     -- use proxy?
     local envs
-    local proxy_conf = proxy.get(url)
+    local proxy_conf = proxy.config(url)
     if proxy_conf then
         envs = {ALL_PROXY = proxy_conf}
     end

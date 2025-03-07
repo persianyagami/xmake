@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        setenv.c
@@ -47,7 +47,5 @@ tb_int_t xm_os_setenv(lua_State* lua)
 
     // set it
     lua_pushboolean(lua, value? tb_environment_set(name, value) : tb_false);
-
-    // ok
     return 1;
 }

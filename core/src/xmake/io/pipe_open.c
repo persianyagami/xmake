@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        pipe_open.c
@@ -47,9 +47,12 @@ tb_int_t xm_io_pipe_open(lua_State* lua)
     tb_char_t const* modestr = luaL_optstring(lua, 2, "r");
     tb_assert_and_check_return_val(name && modestr, 0);
 
-    // get file mode value
-    tb_size_t mode = TB_FILE_MODE_RO;
-    if (modestr[0] == 'w') mode = TB_FILE_MODE_WO;
+    // get pipe mode value
+    tb_size_t mode = TB_PIPE_MODE_RO;
+    if (modestr[0] == 'w') mode = TB_PIPE_MODE_WO;
+
+    // set block mode
+    if (modestr[1] == 'B') mode |= TB_PIPE_MODE_BLOCK;
 
     // get buffer size
     tb_size_t buffsize = (tb_size_t)luaL_checknumber(lua, 3);

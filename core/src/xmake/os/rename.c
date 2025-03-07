@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        rename.c
@@ -43,9 +43,7 @@ tb_int_t xm_os_rename(lua_State* lua)
     tb_char_t const* dst = luaL_checkstring(lua, 2);
     tb_check_return_val(src && dst, 0);
 
-    // done os.rename(src, dst)
+    // do rename
     lua_pushboolean(lua, tb_file_rename(src, dst));
-
-    // ok
     return 1;
 }

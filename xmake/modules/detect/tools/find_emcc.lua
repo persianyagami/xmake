@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_emcc.lua
@@ -21,6 +21,7 @@
 -- imports
 import("lib.detect.find_program")
 import("lib.detect.find_programver")
+import("detect.sdks.find_emsdk")
 
 -- find emcc
 --
@@ -39,6 +40,14 @@ function main(opt)
 
     -- init options
     opt = opt or {}
+
+    -- init the search directories
+    local emsdk = find_emsdk()
+    if emsdk and emsdk.emscripten then
+        local paths = {}
+        table.insert(paths, emsdk.emscripten)
+        opt.paths = paths
+    end
 
     -- find program
     local program = find_program(opt.program or (is_host("windows") and "emcc.bat" or "emcc"), opt)

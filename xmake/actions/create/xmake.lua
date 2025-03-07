@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -38,7 +38,8 @@ task("create")
                 -- options
             ,   options =
                 {
-                    {'l', "language",   "kv", "c++",        "The project language"
+                    {'f', "force",      "k",   nil,         "Force to create project in a non-empty directory."}
+                ,   {'l', "language",   "kv", "c++",        "The project language"
 
                                                             -- show the description of all languages
                                                           , values = function (complete, opt)

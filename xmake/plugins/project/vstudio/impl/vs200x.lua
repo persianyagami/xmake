@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        vs200x.lua
@@ -44,7 +44,7 @@ function make(outputdir, vsinfo)
 
     -- make vsprojs
     for _, target in pairs(project.targets()) do
-        if not target:isphony() then
+        if not target:is_phony() then
             vs200x_vcproj.make(vsinfo, target)
         end
     end

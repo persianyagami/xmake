@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        sandbox.lua
@@ -22,17 +22,17 @@
 local sandbox_core_sandbox = sandbox_core_sandbox or {}
 
 -- load modules
-local sandbox   = require("sandbox/sandbox")
-local raise     = require("sandbox/modules/raise")
-local try       = require("sandbox/modules/try")
-local catch     = require("sandbox/modules/catch")
-local utils     = require("base/utils")
-local table     = require("base/table")
-local colors    = require("base/colors")
-local dump      = require("base/dump")
-local option    = require("base/option")
-local scheduler = require("base/scheduler")
-local history   = require("project/history")
+local sandbox     = require("sandbox/sandbox")
+local raise       = require("sandbox/modules/raise")
+local try         = require("sandbox/modules/try")
+local catch       = require("sandbox/modules/catch")
+local utils       = require("base/utils")
+local table       = require("base/table")
+local colors      = require("base/colors")
+local dump        = require("base/dump")
+local option      = require("base/option")
+local scheduler   = require("base/scheduler")
+local globalcache = require("cache/globalcache")
 
 -- print variables for interactive mode
 function sandbox_core_sandbox._interactive_dump(...)
@@ -82,7 +82,7 @@ function sandbox_core_sandbox.interactive()
         readline.clear_history()
 
         -- load history
-        replhistory = history("global.history"):load("replhistory") or {}
+        replhistory = table.wrap(globalcache.get("history", "replhistory"))
         for _, ln in ipairs(replhistory) do
             readline.add_history(ln)
         end
@@ -93,6 +93,7 @@ function sandbox_core_sandbox.interactive()
     public_scope["$interactive_dump"] = sandbox_core_sandbox._interactive_dump
     public_scope["$interactive_prompt"] = colors.translate("${color.interactive.prompt}${text.interactive.prompt} ")
     public_scope["$interactive_prompt2"] = colors.translate("${color.interactive.prompt2}${text.interactive.prompt2} ")
+    public_scope["$interactive_setfenv"] = setfenv
 
     -- disable scheduler
     scheduler:enable(false)
@@ -110,8 +111,13 @@ function sandbox_core_sandbox.interactive()
         local entries = readline.history_list()
         if #entries > #replhistory then
             for i = #replhistory + 1, #entries do
-                history("global.history"):save("replhistory", entries[i].line)
+                if #replhistory > 64 then
+                    table.remove(replhistory, 1)
+                end
+                table.insert(replhistory, entries[i].line)
+                globalcache.set("history", "replhistory", replhistory)
             end
+            globalcache.save("history")
         end
 
         -- clear history
@@ -121,15 +127,16 @@ end
 
 -- get the filter of the current sandbox for the given script
 function sandbox_core_sandbox.filter(script)
-
-    -- get the current sandbox instance
     local instance = sandbox.instance(script)
     if not instance then
         raise("cannot get sandbox instance!")
     end
-
-    -- get it
     return instance:filter()
+end
+
+-- get all builtin modules
+function sandbox_core_sandbox.builtin_modules()
+    return sandbox.builtin_modules()
 end
 
 -- return module

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -26,9 +26,10 @@ import("core.project.config")
 import("core.base.global")
 import("core.project.project")
 import("core.platform.platform")
-import("core.platform.environment")
 import("private.action.clean.remove_files")
 import("target.action.clean", {alias = "_do_clean_target"})
+import("private.service.remote_build.action", {alias = "remote_build_action"})
+import("private.detect.check_targetname")
 
 -- on clean target
 function _on_clean_target(target)
@@ -52,16 +53,12 @@ end
 function _clean_target(target)
 
     -- has been disabled?
-    if target:get("enabled") == false then
+    if not target:is_enabled() then
         return
     end
 
     -- enter the environments of the target packages
-    local oldenvs = {}
-    for name, values in pairs(target:pkgenvs()) do
-        oldenvs[name] = os.getenv(name)
-        os.addenv(name, unpack(values))
-    end
+    local oldenvs = os.addenvs(target:pkgenvs())
 
     -- the target scripts
     local scripts =
@@ -96,9 +93,7 @@ function _clean_target(target)
     end
 
     -- leave the environments of the target packages
-    for name, values in pairs(oldenvs) do
-        os.setenv(name, values)
-    end
+    os.setenvs(oldenvs)
 end
 
 -- clean the given targets
@@ -110,18 +105,19 @@ end
 
 -- clean target
 function _clean(targetname)
-
-    -- clean the given target
     if targetname then
-        local target = project.target(targetname)
-        _clean_targets(target:orderdeps())
+        local target = assert(check_targetname(targetname))
         _clean_target(target)
     else
         _clean_targets(project.ordertargets())
     end
+end
 
-    -- remove the configure directory if remove all
+-- clean configuration cache
+function _clean_configs()
     if option.get("all") then
+        -- we need to close it first after removing file lock
+        project.filelock():close()
         remove_files(config.directory())
     end
 end
@@ -149,7 +145,6 @@ function _try_clean()
     end
 end
 
--- main
 function main()
 
     -- try cleaning it using third-party buildsystem if xmake.lua not exists
@@ -157,23 +152,31 @@ function main()
         return _try_clean()
     end
 
+    -- do action for remote?
+    if remote_build_action.enabled() then
+        return remote_build_action()
+    end
+
+    -- load config first
+    task.run("config", {require = false}, {disable_dump = true})
+
     -- lock the whole project
     project.lock()
 
     -- get the target name
     local targetname = option.get("target")
 
-    -- config it first
-    task.run("config", {target = targetname, require = false, verbose = false})
-
     -- enter project directory
     local oldir = os.cd(project.directory())
 
-    -- clean the current target
+    -- clean target
     _clean(targetname)
 
     -- unlock the whole project
     project.unlock()
+
+    -- we must call it after unlocking project because it will remove project lockfile
+    _clean_configs()
 
     -- leave project directory
     os.cd(oldir)

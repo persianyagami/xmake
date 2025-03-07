@@ -12,18 +12,18 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_mingw.lua
 --
 
 -- imports
-import("lib.detect.cache")
 import("lib.detect.find_path")
 import("core.base.option")
 import("core.base.global")
 import("core.project.config")
+import("core.cache.detectcache")
 import("detect.sdks.find_cross_toolchain")
 
 -- find mingw directory
@@ -34,11 +34,15 @@ function _find_mingwdir(sdkdir)
         if is_host("macosx", "linux") and os.isdir("/opt/llvm-mingw") then
             sdkdir = "/opt/llvm-mingw"
         elseif is_host("macosx") and os.isdir("/usr/local/opt/mingw-w64") then
+            -- for macOS Intel
             sdkdir = "/usr/local/opt/mingw-w64"
+        elseif is_host("macosx") and os.isdir("/opt/homebrew/opt/mingw-w64") then
+            -- for Apple Silicon
+            sdkdir = "/opt/homebrew/opt/mingw-w64"
         elseif is_host("linux") then
             sdkdir = "/usr"
-        elseif is_subhost("msys") then
-            local mingw_prefix = os.getenv("MINGW_PREFIX")
+        else
+            local mingw_prefix = is_subhost("msys") and os.getenv("MINGW_PREFIX") or os.getenv("LLVM_MINGW_DIR") or os.getenv("LLVM_MINGW_ROOT")
             if mingw_prefix and os.isdir(mingw_prefix) then
                 sdkdir = mingw_prefix
             end
@@ -48,8 +52,11 @@ function _find_mingwdir(sdkdir)
         if not sdkdir then
             local pathenv = os.getenv("PATH")
             if pathenv then
+                local buildhash_pattern = string.rep('%x', 32)
+                local match_pattern = "[\\/]packages[\\/]%w[\\/].*mingw.*[\\/][^\\/]+[\\/]" .. buildhash_pattern .. "[\\/]bin"
                 for _, p in ipairs(path.splitenv(pathenv)) do
-                    if p:find(string.ipattern("mingw[%w%-%_%+]*[\\/]bin")) and path.filename(p) == "bin" and os.isdir(p) then
+                    if (p:find(match_pattern) or p:find(string.ipattern("mingw[%w%-%_%+]*[\\/]bin"))) and
+                        path.filename(p) == "bin" and os.isdir(p) then
                         sdkdir = path.directory(p)
                         break
                     end
@@ -94,6 +101,9 @@ function _find_mingw(sdkdir, bindir, cross)
 
     -- find cross toolchain
     local toolchain = find_cross_toolchain(sdkdir or bindir, {bindir = bindir, cross = cross})
+    if not toolchain then -- fallback, e.g. gcc.exe without cross
+        toolchain = find_cross_toolchain(sdkdir or bindir, {bindir = bindir})
+    end
     if toolchain then
         return {sdkdir = toolchain.sdkdir, bindir = toolchain.bindir, cross = toolchain.cross}
     end
@@ -121,7 +131,7 @@ function main(sdkdir, opt)
 
     -- attempt to load cache first
     local key = "detect.sdks.find_mingw"
-    local cacheinfo = cache.load(key)
+    local cacheinfo = detectcache:get(key) or {}
     if not opt.force and cacheinfo.mingw and cacheinfo.mingw.sdkdir and os.isdir(cacheinfo.mingw.sdkdir) then
         return cacheinfo.mingw
     end
@@ -147,8 +157,7 @@ function main(sdkdir, opt)
 
     -- save to cache
     cacheinfo.mingw = mingw or false
-    cache.save(key, cacheinfo)
-
-    -- ok?
+    detectcache:set(key, cacheinfo)
+    detectcache:save()
     return mingw
 end

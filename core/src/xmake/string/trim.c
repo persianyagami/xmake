@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      OpportunityLiu
  * @file        trim.c
@@ -65,11 +65,9 @@ static tb_char_t const* xm_string_ltrim(tb_char_t const* sstr, tb_char_t const* 
     // check
     tb_assert(sstr && estr && ctrim);
 
-    // done
     tb_char_t const* p = sstr;
     while (p < estr && tb_strnchr(ctrim, ntrim, *p))
         p++;
-
     return p;
 }
 
@@ -78,11 +76,9 @@ static tb_char_t const* xm_string_rtrim(tb_char_t const* sstr, tb_char_t const* 
     // check
     tb_assert(sstr && estr && ctrim);
 
-    // done
     tb_char_t const* p = estr - 1;
     while (p >= sstr && tb_strnchr(ctrim, ntrim, *p))
         p--;
-
     return p + 1;
 }
 

@@ -12,7 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        yasm.lua
@@ -20,6 +20,8 @@
 
 -- imports
 import("core.base.option")
+import("core.project.policy")
+import("core.language.language")
 
 -- init it
 function init(self)
@@ -47,20 +49,15 @@ end
 
 -- make the warning flag
 function nf_warning(self, level)
-
-    -- the maps
-    local maps =
-    {
+    local maps = {
         none  = "-w"
     }
-
-    -- make it
     return maps[level]
 end
 
 -- make the define flag
 function nf_define(self, macro)
-    return "-D" .. macro
+    return {"-D" .. macro}
 end
 
 -- make the undefine flag
@@ -70,7 +67,7 @@ end
 
 -- make the includedir flag
 function nf_includedir(self, dir)
-    return "-I" .. os.args(dir)
+    return {"-I", dir}
 end
 
 -- make the sysincludedir flag
@@ -79,12 +76,12 @@ function nf_sysincludedir(self, dir)
 end
 
 -- make the compile arguments list
-function _compargv1(self, sourcefile, objectfile, flags)
+function compargv(self, sourcefile, objectfile, flags)
     return self:program(), table.join(flags, "-o", objectfile, sourcefile)
 end
 
 -- compile the source file
-function _compile1(self, sourcefile, objectfile, dependinfo, flags)
+function compile(self, sourcefile, objectfile, dependinfo, flags, opt)
 
     -- ensure the object directory
     os.mkdir(path.directory(objectfile))
@@ -93,7 +90,7 @@ function _compile1(self, sourcefile, objectfile, dependinfo, flags)
     local outdata, errdata = try
     {
         function ()
-            return os.iorunv(_compargv1(self, sourcefile, objectfile, flags))
+            return os.iorunv(compargv(self, sourcefile, objectfile, flags))
         end,
         catch
         {
@@ -111,7 +108,7 @@ function _compile1(self, sourcefile, objectfile, dependinfo, flags)
             function (ok, outdata, errdata)
 
                 -- show warnings?
-                if ok and errdata and (option.get("diagnosis") or option.get("warning")) then
+                if ok and errdata and policy.build_warnings(opt) then
                     errdata = errdata:trim()
                     if #errdata > 0 then
                         cprint("${color.warning}%s", errdata)
@@ -120,25 +117,5 @@ function _compile1(self, sourcefile, objectfile, dependinfo, flags)
             end
         }
     }
-end
-
--- make the compile arguments list
-function compargv(self, sourcefiles, objectfile, flags)
-
-    -- only support single source file now
-    assert(type(sourcefiles) ~= "table", "'object:sources' not support!")
-
-    -- for only single source file
-    return _compargv1(self, sourcefiles, objectfile, flags)
-end
-
--- compile the source file
-function compile(self, sourcefiles, objectfile, dependinfo, flags)
-
-    -- only support single source file now
-    assert(type(sourcefiles) ~= "table", "'object:sources' not support!")
-
-    -- for only single source file
-    _compile1(self, sourcefiles, objectfile, dependinfo, flags)
 end
 

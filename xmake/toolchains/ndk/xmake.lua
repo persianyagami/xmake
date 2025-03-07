@@ -12,24 +12,28 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Copyright (C) 2015-2020, TBOOX Open Source Group.
+-- Copyright (C) 2015-present, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
 --
 
--- define toolchain
+-- android ndk toolchain
+--
+-- @param sdkver    the platform sdk version
+--
+-- @code
+-- target("test")
+--     ...
+--     set_toolchains("ndk")
+--     set_toolchains("ndk", {sdkver = "23"})
+-- @endcode
+--
 toolchain("ndk")
-
-    -- set homepage
+    set_kind("standalone")
     set_homepage("https://developer.android.com/ndk")
     set_description("Android NDK")
+    set_runtimes("c++_static", "c++_shared")
 
-    -- mark as standalone toolchain
-    set_kind("standalone")
-
-    -- check toolchain
     on_check("check")
-
-    -- load toolchain
     on_load("load")

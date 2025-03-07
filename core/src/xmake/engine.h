@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright (C) 2015-2020, TBOOX Open Source Group.
+ * Copyright (C) 2015-present, TBOOX Open Source Group.
  *
  * @author      ruki
  * @file        engine.h
@@ -71,13 +71,21 @@ tb_void_t                   xm_engine_exit(xm_engine_ref_t engine);
  */
 tb_int_t                    xm_engine_main(xm_engine_ref_t engine, tb_int_t argc, tb_char_t** argv, tb_char_t** taskargv);
 
-/*! register lni modules in the engine, @note we need call it in lni_initalizer()
+/*! register lni modules in the engine, @note we need to call it in lni_initalizer()
  *
  * @param engine            the engine
  * @param module            the lni module name
  * @param funcs             the lni module functions
  */
 tb_void_t                   xm_engine_register(xm_engine_ref_t engine, tb_char_t const* module, luaL_Reg const funcs[]);
+
+/*! add the embed files
+ *
+ * @param name              the engine name
+ * @param data              the embedfiles data
+ * @param size              the data size
+ */
+tb_void_t                   xm_engine_add_embedfiles(xm_engine_ref_t engine, tb_byte_t const* data, tb_size_t size);
 
 /*! run main entry of the engine singleton
  *
